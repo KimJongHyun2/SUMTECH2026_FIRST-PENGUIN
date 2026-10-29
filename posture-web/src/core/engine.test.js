@@ -163,7 +163,7 @@ describe('세션 상태 (F3·F5·F1)', () => {
   });
 });
 
-describe('리포트 (F6, docs/report-contract.md)', () => {
+describe('리포트 (F6, docs/prd.md 4절)', () => {
   it('유효 1800초마다 자동 리포트를 만들고 세션은 계속, 종료 시 남은 구간만 부분 리포트 (S3)', () => {
     const engine = newEngine();
     let r = feed(engine, 0, 1800, GOOD);

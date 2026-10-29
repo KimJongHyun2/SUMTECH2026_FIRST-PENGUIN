@@ -1,5 +1,5 @@
 // 한 프레임의 입력 품질과 기준 대비 이탈을 판정한다.
-// 경계값은 p1 T1 데이터에서 잡은 파일럿 값이며 실측으로 다시 정한다(docs/planning-policy.yaml threshold).
+// 경계값은 p1 T1 데이터에서 잡은 파일럿 값이며 실측으로 다시 정한다(docs/prd.md 2절).
 import { POLICY } from './policy.js';
 
 export const MODEL_VERSION = 'pose_landmarker_lite/float16/1+face_landmarker/float16/1';

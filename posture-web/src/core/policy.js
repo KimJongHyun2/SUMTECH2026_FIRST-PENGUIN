@@ -1,4 +1,4 @@
-// 공통 정책값 (docs/planning-policy.yaml). 기획 확정 기본값이며 건강 효과·감지 성능은 미검증이다.
+// 운영 기본값 (docs/prd.md 3절). 기획 확정 기본값이며 건강 효과·감지 성능은 미검증이다.
 export const POLICY = Object.freeze({
   baselineStableSeconds: 5,
   deviationSeconds: 10,
@@ -7,7 +7,7 @@ export const POLICY = Object.freeze({
   reportValidSeconds: 1800,
 });
 
-// 딥 모드 연결 시간값은 기획에서 미확정이다(pendingDecisions.connection).
+// QR 만료 120초는 확정값이다. 감시·장애·자체 중단 시간은 실기기로 확정한다(docs/prd.md 6절).
 // 구현을 위해 archive/planning-history의 과거 제안값을 임시로 쓰며, 확정 조건으로 표시하지 않는다.
 export const CONNECTION_PILOT = Object.freeze({
   qrExpirySeconds: 120,

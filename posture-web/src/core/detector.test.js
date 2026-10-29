@@ -90,7 +90,7 @@ describe('validateSettings (F5)', () => {
   });
 });
 
-describe('windowMetrics (report-contract C01·C02 대응)', () => {
+describe('windowMetrics (PRD 4절·가상 산술 C01·C02 대응)', () => {
   it('구간과 겹치는 부분만 이탈 시간으로 세고, 끝난 이유별로 복귀·중단을 나눈다', () => {
     const ledger = {
       validNow: 90000,

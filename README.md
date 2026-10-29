@@ -1,32 +1,80 @@
-# SUMTECH2026 FIRST-PENGUIN — 패스트거북이
+# SUMTECH 2026 루프톤 — 패스트거북이
 
-패스트거북이는 노트북 공부·작업 중 지속적인 자세 변화를 알려 사용자가 더 빨리 알아차리고 스스로 조정하도록 돕는 거북목 예방 지원 서비스이다. 핵심 문제는 **작업 몰입 시 발생하는 자세 인지 불능(Unawareness)**, 즉 자세 변화를 제때 알아차리지 못하는 상황이다. 의학적 치료·진단·발병 확률 계산은 범위 밖이다.
+패스트거북이는 노트북 공부·작업에 몰입한 대학생에게 지속적인 자세 변화를 알려 스스로 조정하도록 돕는 서비스이다. 개인 기준 대비 변화를 안내하며 치료·진단·예방 효과를 보장하지 않는다.
 
-성공 지표는 **자세 이탈 비율 R = 확정 이탈 시간 D / 전체 세션 유효 시간 V × 100(%)**이다. 비교 가능한 조건에서 감소 여부를 확인하고, 인지까지 걸리는 시간·오경고·작업 방해도 별도 검증한다. V=0이면 계산 불가이며 보류·등록·정지 시간은 제외한다. 자세 변화 감지·알림 발생만으로 인지 향상이나 예방 효과를 확정하지 않는다.
+## 구현 설계
 
-단일 정책은 기준 등록 5초·최초 연속 유효 이탈 10초·복귀 3초·재경고 60초·자동 리포트 누적 유효 30분이다. 자리 비움·인식 불가는 판정 보류·연속 타이머 초기화, 딥 장애는 유효 정면 기준·입력과 사용자 선택 후 기본 전환이다. 로그인 없이 같은 PC 사이트·브라우저 프로필에 로컬 저장한다. 화면 상태 문구 ‘거북목이에요’는 유지한다.
+핵심 흐름은 개인 기준 등록 → 탐지 → 지속 이탈 경고 → 복귀 → 리포트·기록 확인이다. 로그인 없이 같은 PC 브라우저에 기준·설정·세션·리포트를 저장한다. 선택형 딥 모드는 휴대폰 측면 입력을 추가한다. 두 경로 모두 현재 채택 범위이며, 기획과 실제 구현 완료는 구분한다.
 
-기획 점수는 사용자 전달 기준 **14.6/30**, 목표는 **20점대 상위권**이다. 팀 제공 인터뷰 E1~E3·five_whys·why_ours를 반영한다. 핵심 기능은 problem.yaml, 상세 정책·구현 계약·리스크는 PRD를 따른다. 문서 검사와 앱·E2E·효과·점수 검증은 별도로 확인한다.
+| 문서 | 역할 |
+|---|---|
+| [문제정의·기능 명세](docs/problem.yaml) | 사용자 경험·근거·대안·선택 이유·기능별 입력·결과·완료 조건이다. |
+| [사용자 흐름](docs/scenarios.yaml) | 주 사용 플랫폼, 행동 순서와 최종 확인 결과이다. |
+| [MVP 구현 설계](docs/prd.md) | 화면·판정·시간·상태 전이·집계·저장·실패 처리·시험 설계이다. |
+| [진행 기록](progress.md) | 실행 결과·미완료 조건·팀 결정 대기이다. |
 
-- [문제정의·기능 명세](docs/problem.yaml)
-- [독립 사용자 흐름과 기대 결과](docs/scenarios.yaml)
-- [최신 PRD](docs/prd.md)
-- [공통 정책값·용어](docs/planning-policy.yaml)
-- [집계·중단·삭제 계약](docs/report-contract.md)
-- [검증 계획과 실행 제약](docs/validation-plan.md)
-- [기획 문서 연결 기준](docs/integration-notes.md)
-- [기획 평가 대응 기준](docs/scoring-strategy.md)
-- [최신 Starter Kit 대조](docs/starter-kit-review.md)
-- [과거 기획·초기 실험 아카이브](archive/README.md)
-- [진행 기록](progress.md)
+기록의 읽기·변경·삭제 범위는 같은 사이트·브라우저 프로필이다. 구현의 기본값은 [policy.js](posture-web/src/core/policy.js), 세부 동작·실패 조건은 PRD를 따른다. 정책 변경은 기능 명세·시나리오·구현과 함께 맞춘다. 과거 자료는 [archive](archive/README.md)에 둔다.
 
-문서 검사는 `tools` 디렉터리에서 `npm ci`로 기존 의존성을 준비한 뒤 저장소 루트에서 실행한다.
+팀은 캡스톤 디자인과 해커톤에서 노트북으로 작업하는 IT융합학과 4학년 당사자들이다. 팀 소개 원문은 [정리 전 기록](archive/planning-history/2026-10-30-docs-consolidation/problem.before-consolidation.yaml)에 보존한다. 당사자 경험 자체를 효과·차별성의 입증으로 사용하지 않는다.
+
+## 설치·개발·검사
+
+Node.js 24를 기준으로 한다. 명령은 저장소 루트에서 실행한다. 개발 서버의 실제 HTTPS 주소는 Vite 출력으로 확인한다.
+
+```sh
+npm ci --prefix tools
+npm ci --prefix posture-web
+npm run dev --prefix posture-web
+```
 
 ```sh
 node tools/check-problem.mjs
 node tools/check-planning.mjs
+npm test --prefix posture-web
+npm run build --prefix posture-web
 ```
 
-이 검사는 문서 구조·참조·가상 구간 산술을 확인하며 앱 실행·주최측 재현·기획 재채점을 대신하지 않는다. 테스트 가용성 정책은 [PRD §5.1·§8.1](docs/prd.md)에 명시한다. 운영 자동 리포트는 30분이며 S3은 테스트에서 첫 주기만 3초로 가속하고, S5·S6은 단일 PC의 측면 데이터 주입 버튼으로 재현하도록 설계한다. 테스트 도구·E2E spec 구현, 실제 실행, 운영 1800초·실기기 시험과 주최측 mock 예외 수용 확인은 남아 있다.
+문제정의 검사는 형식 오류와 내용 보강 대상을 구분한다. null·빈 배열을 채우려고 경험·근거를 만들지 않는다. 정적 검사는 문서 규격·코드 기본값 대조·가상 산술이며 기획 점수나 앱 실행 성공이 아니다.
 
-초기 구현 실행 안내는 [posture-web/README.md](posture-web/README.md)에 있다. 과거 정적 확인에서 발견한 기획과 구현의 차이는 [구현 대조 기록](archive/planning-history/implementation-status.md)에 있다.
+## 환경변수
+
+| 이름 | 용도 | 설정 위치 |
+|---|---|---|
+| `RELEASE_ID` | 실제 빌드·배포 commit 전체 SHA이다. 로컬 기본값 dev는 제출 버전이 아니다. | Docker 빌드·실행 환경, CI 또는 배포 환경이다. |
+| `AI_GATEWAY_API_KEY` | 향후 서버 AI 호출에 쓰는 비밀키이다. 현재 서비스는 Gateway를 호출하지 않는다. | 필요할 때 서버·배포 환경과 GitHub Secrets에 직접 설정한다. |
+| `PORT` | 로컬 Node 서버 포트이다. Docker의 app은 3000을 사용한다. | 로컬 실행 환경이다. |
+| `E2E_BASE_URL` | 로컬 E2E가 접속하는 앱 주소이다. 주최 측 주소는 실행 환경이 정한다. | E2E 실행 환경이다. |
+| `EVAL_ENABLED` | PRD의 평가용 빌드를 위한 제안된 설정이다. 아직 구현·배포 연결 전이다. | 구현 후 빌드 단계에 연결할 항목이다. 현재 이 값만 넣어도 켜지지 않는다. |
+
+비밀값은 저장소·브라우저 번들·로그에 넣지 않는다. `.env.example`은 변수 이름만 제공한다.
+
+## 루프톤 제출 요건
+
+2026-10-30 공식 API에서 받은 Starter Kit의 START_HERE·steps/02-problem·steps/03-delivery·예시 양식과 대조했다. ZIP SHA-256은 `304478e454c1fc7d0d68a01b90892af63715e4fcf0bbf3dc4cf08fb7f4c7c61e`이다. 아래는 제출·실행 요건이며 세부 배점표가 아니다.
+
+- 기본 브랜치의 `docs/problem.yaml`·`docs/scenarios.yaml`과 구현 설계가 있어야 한다. 흐름은 3~8개, 단계는 1~12개, 제목은 1~120자, expected는 1~500자이다. 채택한 해법마다 끝까지 수행하는 흐름을 둔다.
+- 주최 측은 배포 사이트 대신 저장소의 `Dockerfile`·`docker-compose.yml`로 앱을 빈 DB에서 띄운다. app은 컨테이너 안 3000 포트를 사용한다. 이 서비스는 로그인·서버 DB가 없어 시드 계정도 없다.
+- 빌드는 10분 이내, 기동부터 `/__health` 200까지는 2분 이내이다. health는 인증·리다이렉트 없이 실제 배포 SHA를 releaseId로 반환한다.
+- 각 흐름에 `e2e/scenarios/<id>.spec.ts` 하나와 test 하나를 둔다. UI 단계와 최종 값을 실제로 검증하고 앞 흐름의 데이터에 기대지 않는다. 입력 자료는 저장소의 `e2e/fixtures/`에 포함한다.
+- 흐름은 로컬에서 1분 안에 끝나야 한다. 주최 측은 자체 Playwright 설정을 쓰므로 팀의 globalSetup·storageState·retries·카메라 설정에 기대지 않는다. spec은 baseURL 기준 상대 주소를 사용한다.
+- skip·가짜 응답/상태·단계 우회를 쓰지 않는다. PRD의 녹화 입력·측면 모의 입력·시간 가속은 팀 설계이며 각각의 허용 여부는 미확인이다.
+- 공개 HTTPS 배포는 발표·대시보드 상태용이다. CI·실제 실행·배포 버전을 각각 확인한다. 키트에는 30점 상세 배점표가 없다.
+
+## Docker·흐름 검증
+
+```sh
+docker compose down -v
+docker compose up -d --build
+curl --fail http://localhost:3000/__health
+node tools/check-planning.mjs --submission
+npm ci --prefix e2e
+```
+
+E2E 자료·구현을 준비한 뒤 e2e 디렉터리에서 실행한다.
+
+```sh
+npx playwright install chromium
+npx playwright test --project=desktop --forbid-only
+```
+
+테스트가 없으면 실패한다. 제출 자료 존재 검사도 파일 내용·영상 추론·실제 E2E 통과를 대신하지 않는다. 현재 준비 상태는 진행 기록을 따른다. 실제 제출에서는 CI가 하는 것처럼 RELEASE_ID에 빌드 대상 SHA를 주입한다.

@@ -1,131 +1,94 @@
-// docs/problem.yaml 자가 검사
-// 키트 steps/02-problem.md의 "탄탄한 칸" 기준과 problem.example.yaml의 키를 그대로 검사한다.
-// 실행: cd tools && npm install && npm run check
-// 점수표가 아니라 "대시보드가 읽는 파일에 무엇이 비었고 무엇이 약한가"를 보여 주는 도구다.
+// 문제정의의 형식 오류와 내용 보강 대상을 구분한다. 사실·점수는 판정하지 않는다.
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import yaml from 'js-yaml';
 
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import yaml from "js-yaml";
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const errors = [];
+const warnings = [];
+const mapping = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+const empty = (value) => value === null || value === undefined || value === '';
 
-const here = path.dirname(fileURLToPath(import.meta.url));
-const file = path.resolve(here, "..", "docs", "problem.yaml");
-const doc = yaml.load(fs.readFileSync(file, "utf8"));
-
-const fails = []; // 비었거나 형식이 틀림 → 대시보드가 빈칸으로 봄
-const warns = []; // 채워졌지만 "탄탄한 칸" 기준에 약함
-const oks = [];
-
-const empty = (v) =>
-  v == null || (typeof v === "string" && v.trim() === "") || (Array.isArray(v) && v.length === 0);
-const text = (v) => (typeof v === "string" ? v : "");
-
-// ── 1. 캔버스 6칸 + 한 문장 ─────────────────────────────────────────
-const canvas = doc.canvas ?? {};
-const cells = {
-  "statement (한 문장)": doc.statement,
-  "① context 상황": canvas.context,
-  "② customer 고객": canvas.customer,
-  "③ root_problem 근본 문제": canvas.root_problem,
-  "④ impact.feeling 감정": canvas.impact?.feeling,
-  "④ impact.measurable 측정 가능한 영향": canvas.impact?.measurable,
-};
-for (const [k, v] of Object.entries(cells)) (empty(v) ? fails : oks).push(k);
-
-// 일반론 표현: "실제로 겪은 구체적인 장면" 기준
-const generic = /(많은|대부분의|다들|요즘|누구나|사람들은)/;
-for (const k of ["context", "customer", "root_problem"]) {
-  if (generic.test(text(canvas[k]))) warns.push(`canvas.${k}: 일반론 표현("많은/대부분/다들")이 있음 — 언제·어디서·무슨 일로 바꾸기`);
-}
-// 해법에서 거꾸로 만든 문제: "기능이 없어서"
-if (/기능이 없|앱이 없|서비스가 없/.test(text(canvas.root_problem))) warns.push("root_problem: '기능이 없어서'는 해법에서 거꾸로 만든 문제");
-
-// ── 2. 대안과 단점 (짝) ────────────────────────────────────────────
-const alts = canvas.alternatives ?? [];
-if (alts.length === 0) fails.push("⑤⑥ alternatives 현재 대안");
-alts.forEach((a, i) => {
-  for (const k of ["how_used", "shortcoming", "why_ours"])
-    if (empty(a[k])) fails.push(`alternatives[${i}].${k}`);
-  if (/도구|앱|서비스$/.test(text(a.how_used)) && text(a.how_used).length < 12)
-    warns.push(`alternatives[${i}].how_used: 도구 이름만 있음 — 실제 행동으로`);
-});
-
-// ── 3. 뒷면: personas / experiences / sources ─────────────────────
-const personas = doc.personas ?? [];
-if (personas.length === 0) fails.push("personas 대상 (실제 대상 1명)");
-personas.forEach((p, i) => for_each_key(p, ["id", "description", "source"], `personas[${i}]`));
-
-const exps = doc.experiences ?? [];
-if (exps.length === 0) fails.push("experiences 실제 경험 (언제·무슨 일·대응·기분·실제 한 말)");
-exps.forEach((e, i) => {
-  for_each_key(e, ["id", "when", "what_happened", "workaround", "feeling", "quote", "source"], `experiences[${i}]`);
-  if (!/\d|지난|작년|올해|어제|달|주|학기/.test(text(e.when))) warns.push(`experiences[${i}].when: 시점이 구체적이지 않음`);
-});
-
-const sources = doc.sources ?? [];
-if (sources.length === 0) fails.push("sources 외부 근거 (열어 확인한 https URL + 원문이 직접 말하는 claim)");
-sources.forEach((s, i) => {
-  for_each_key(s, ["id", "url", "title", "claim"], `sources[${i}]`);
-  if (!/^https:\/\//.test(text(s.url))) fails.push(`sources[${i}].url: https:// 로 시작하지 않음`);
-  if (/example\.com/.test(text(s.url))) fails.push(`sources[${i}].url: 예시 주소`);
-});
-
-// 출처 없는 수치: canvas·statement에 숫자+단위가 있는데 sources가 비었거나 '추정' 표시가 없음
-const numeric = /\d+(\.\d+)?\s*(%|명|분|시간|초|원|배|건|회|cm|°)/;
-const canvasText = [doc.statement, canvas.context, canvas.customer, canvas.root_problem, canvas.impact?.feeling, canvas.impact?.measurable].map(text).join("\n");
-if (numeric.test(canvasText) && sources.length === 0 && !/추정|직접 잰|직접 측정/.test(canvasText))
-  warns.push("캔버스에 수치가 있는데 sources가 비어 있고 '추정' 표시도 없음 — 출처 없는 수치");
-
-// ── 4. 5 Whys / solution_paths / insight ──────────────────────────
-const fw = doc.five_whys ?? {};
-if (empty(fw.symptom)) fails.push("five_whys.symptom");
-if (empty(fw.whys)) fails.push("five_whys.whys");
-else if (fw.whys.length < 3) warns.push(`five_whys.whys: ${fw.whys.length}단계 — 원인이 끝까지 파고들어졌는지 확인`);
-else oks.push(`five_whys ${fw.whys.length}단계`);
-
-const paths = doc.solution_paths ?? [];
-if (paths.length === 0) fails.push("solution_paths");
-if (!paths.some((p) => p.status === "chosen")) fails.push("solution_paths: chosen 이 없음");
-paths.forEach((p, i) => {
-  for_each_key(p, ["path", "status", "reason"], `solution_paths[${i}]`);
-  if (!["chosen", "rejected", "deferred"].includes(p.status)) fails.push(`solution_paths[${i}].status: ${p.status} (chosen/rejected/deferred)`);
-});
-
-const ins = doc.insight ?? {};
-for (const k of ["claim", "evidence", "design_decision"]) (empty(ins[k]) ? fails : oks).push(`insight.${k}`);
-if (!empty(ins.evidence) && !/\b[ER]\d+\b/.test(text(ins.evidence)))
-  warns.push("insight.evidence: experiences(E1)·sources(R1) id를 함께 적으면 근거가 연결됨");
-
-// ── 5. features ───────────────────────────────────────────────────
-const feats = doc.features ?? [];
-if (feats.length === 0) fails.push("features");
-const observable = /(보인다|표시|남아|바뀐다|바뀌고|이동|오고|온다|저장|멈춘다|돌아간다|비활성|활성)/;
-feats.forEach((f, i) => {
-  for_each_key(f, ["id", "name", "input", "output", "done"], `features[${i}]`);
-  if (!observable.test(text(f.done))) warns.push(`features[${i}] ${f.id}.done: 관찰할 수 있는 결과(보인다·표시·남아…)가 없음`);
-  if (/학생 답 대기|미정|TBD/.test(text(f.done))) warns.push(`features[${i}] ${f.id}.done: 미정 표시가 남아 있음 — 수치 확정 필요`);
-});
-if (feats.length) oks.push(`features ${feats.length}개`);
-
-// ── 출력 ──────────────────────────────────────────────────────────
-function for_each_key(obj, keys, label) {
-  for (const k of keys) if (empty(obj?.[k])) fails.push(`${label}.${k}`);
+function object(value, label) {
+  if (!mapping(value)) { errors.push(`${label}: 객체가 필요하다.`); return {}; }
+  return value;
 }
 
-const total = Object.keys(cells).length + 3 /* alternatives·personas·experiences */ + 1 /* sources */ + 2 /* five_whys·solution_paths */ + 3 /* insight */ + 1 /* features */;
-const filled = total - new Set(fails.map((f) => f.split(/[\[.:]/)[0])).size;
+function string(value, label) {
+  if (empty(value)) warnings.push(`${label}: 팀의 확인된 내용으로 보강할 항목이다.`);
+  else if (typeof value !== 'string') errors.push(`${label}: 문자열 또는 null이어야 한다.`);
+  else if (!value.trim()) warnings.push(`${label}: 공백만 있다.`);
+}
 
-console.log(`\ndocs/problem.yaml 자가 검사 — ${path.relative(process.cwd(), file)}`);
-console.log(`채워진 블록 ${filled}/${total}\n`);
-if (fails.length) {
-  console.log("■ 비었거나 형식이 틀림 (대시보드가 빈칸으로 봄)");
-  for (const f of fails) console.log("  ✗ " + f);
+function fields(value, keys, label) {
+  const item = object(value, label);
+  for (const key of keys) string(item[key], `${label}.${key}`);
+  return item;
 }
-if (warns.length) {
-  console.log("\n■ 채워졌지만 '탄탄한 칸' 기준에 약함");
-  for (const w of warns) console.log("  △ " + w);
+
+function list(value, label) {
+  if (!Array.isArray(value)) { errors.push(`${label}: 배열이 필요하다. 미확인은 []로 남긴다.`); return []; }
+  if (!value.length) warnings.push(`${label}: 아직 기록이 없다.`);
+  return value;
 }
-console.log("\n■ 채워짐");
-for (const o of oks) console.log("  ✓ " + o);
-console.log("");
-process.exitCode = fails.length ? 1 : 0;
+
+function ids(items, label) {
+  const seen = new Set();
+  for (const [index, item] of items.entries()) {
+    if (!mapping(item) || empty(item.id)) continue;
+    if (seen.has(item.id)) errors.push(`${label}[${index}].id: 중복 ID ${item.id}`);
+    seen.add(item.id);
+  }
+}
+
+try {
+  const doc = object(yaml.load(fs.readFileSync(path.join(root, 'docs/problem.yaml'), 'utf8')), 'problem');
+  const allowed = ['statement', 'canvas', 'personas', 'experiences', 'sources', 'five_whys', 'solution_paths', 'insight', 'features'];
+  for (const key of Object.keys(doc)) if (!allowed.includes(key)) errors.push(`problem.${key}: Starter Kit 양식에 없는 최상위 키이다.`);
+  string(doc.statement, 'statement');
+  const canvas = object(doc.canvas, 'canvas');
+  for (const key of ['context', 'customer', 'root_problem']) string(canvas[key], `canvas.${key}`);
+  fields(canvas.impact, ['feeling', 'measurable'], 'canvas.impact');
+  list(canvas.alternatives, 'canvas.alternatives').forEach((item, index) => fields(item, ['how_used', 'shortcoming', 'why_ours'], `canvas.alternatives[${index}]`));
+
+  const definitions = {
+    personas: ['id', 'description', 'source'],
+    experiences: ['id', 'when', 'what_happened', 'workaround', 'feeling', 'quote', 'source'],
+    sources: ['id', 'url', 'title', 'claim'],
+    features: ['id', 'name', 'input', 'output', 'done'],
+  };
+  for (const [name, keys] of Object.entries(definitions)) {
+    const items = list(doc[name], name);
+    items.forEach((item, index) => fields(item, keys, `${name}[${index}]`));
+    ids(items, name);
+  }
+  for (const [index, source] of (Array.isArray(doc.sources) ? doc.sources : []).entries()) {
+    if (!mapping(source) || empty(source.url) || typeof source.url !== 'string') continue;
+    try {
+      const url = new URL(source.url);
+      if (url.protocol !== 'https:' || !url.hostname || url.hostname === 'example.com') throw new Error();
+    } catch { errors.push(`sources[${index}].url: 실제 공개 HTTPS 주소가 필요하다.`); }
+  }
+  const why = object(doc.five_whys, 'five_whys');
+  string(why.symptom, 'five_whys.symptom');
+  list(why.whys, 'five_whys.whys').forEach((item, index) => string(item, `five_whys.whys[${index}]`));
+  // 질문 횟수는 공식 요건이 아니다. 미확인 내용을 채우도록 강제하지 않는다.
+  const paths = list(doc.solution_paths, 'solution_paths');
+  paths.forEach((item, index) => {
+    fields(item, ['path', 'status', 'reason'], `solution_paths[${index}]`);
+    if (mapping(item) && !empty(item.status) && !['chosen', 'rejected', 'deferred'].includes(item.status)) {
+      errors.push(`solution_paths[${index}].status: chosen/rejected/deferred 중 하나여야 한다.`);
+    }
+  });
+  if (!paths.some((item) => item?.status === 'chosen')) warnings.push('solution_paths: 선택한 해법이 아직 없다.');
+  fields(doc.insight, ['claim', 'evidence', 'design_decision'], 'insight');
+
+  for (const message of warnings) console.warn(`보강: ${message}`);
+  for (const message of errors) console.error(`오류: ${message}`);
+  console.log(`문제정의 형식 검사: 오류 ${errors.length}개, 보강 ${warnings.length}개. null·빈 배열은 보강 대상으로 남긴다. 사실·논리·점수 검증은 별도이다.`);
+  process.exitCode = errors.length ? 1 : 0;
+} catch (error) {
+  console.error(`문제정의 형식 검사 실패: ${error.message}`);
+  process.exitCode = 1;
+}

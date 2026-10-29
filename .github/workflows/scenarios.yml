@@ -1,4 +1,4 @@
-# 루프톤 시나리오 검사 (loopthon-starter/workflows/scenarios.yml 그대로). 주최 측 실행과 같은 순서로
+# 루프톤 시나리오 검사 (loopthon-starter/workflows/scenarios.yml 기준). 주최 측 실행과 같은 순서로
 # docker compose 기동 → /__health 대기 → Playwright 실행.
 # 실제 AI 호출이 팀 예산에서 쓰일 수 있어 기본 브랜치 push와 수동 실행(Actions 탭 → Run workflow)에서만 돈다.
 name: scenarios
@@ -48,7 +48,8 @@ jobs:
         run: |
           npm install
           npx playwright install --with-deps chromium
-          npx playwright test --pass-with-no-tests --forbid-only
+          # 테스트 파일이 없으면 실패한다. 문서 검사 통과와 구분한다.
+          npx playwright test --forbid-only
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v7
