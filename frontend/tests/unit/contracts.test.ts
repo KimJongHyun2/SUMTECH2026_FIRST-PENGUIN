@@ -33,23 +33,15 @@ const newEngine = (id = "test") =>
     settings: DEFAULT_SETTINGS,
   });
 
-test("registration keeps time over a short gap but restarts after a long one", () => {
-  const short = createCollector();
-  short.push(0, sample);
-  short.push(3000, sample);
-  expect(short.push(4000, null).status).toBe("paused");
-  short.push(5000, sample);
-  expect(short.push(6000, sample).status).toBe("collecting");
-  expect(short.push(7000, sample).status).toBe("done");
-
-  const long = createCollector();
-  long.push(0, sample);
-  long.push(3000, sample);
-  long.push(4000, null);
-  expect(long.push(6500, null).status).toBe("restarted");
-  long.push(7000, sample);
-  expect(long.push(11000, sample).status).toBe("collecting");
-  expect(long.push(12000, sample).status).toBe("done");
+// 기본 recognitionGraceSeconds는 0초다(docs/prd.md). 2초 유예 파일럿은 core detector 테스트가 따로 검증한다.
+test("registration restarts on the first missing frame with the default policy", () => {
+  const collector = createCollector();
+  collector.push(0, sample);
+  collector.push(3000, sample);
+  expect(collector.push(4000, null).status).toBe("restarted");
+  collector.push(5000, sample);
+  expect(collector.push(9000, sample).status).toBe("collecting");
+  expect(collector.push(10000, sample).status).toBe("done");
 });
 test("warning at ten seconds and paused time excluded", () => {
   const e = newEngine();

@@ -1,7 +1,8 @@
-// 딥 모드 연결 클라이언트 (F8·F10, docs/prd.md 6절). PC와 휴대폰이 /relay WebSocket에 붙는 공용 로직이다.
+// 딥 모드 연결 클라이언트 (F8·F10, docs/prd.md 6절). /relay WebSocket과 동일 브라우저 탭 폴백을 제공한다.
 // 화면(DOM)을 다루지 않는다. 화면은 status·notice 같은 상태를 읽어 그리고, on()으로 유실·종료 요청을 받는다.
 import { CONNECTION_PILOT } from '../../shared/deep-protocol.js';
 import { ClockOffset, sideQuality } from '../core/deep.js';
+import { BroadcastRelay } from '../../shared/broadcast-relay.js';
 
 const HEARTBEAT_MS = CONNECTION_PILOT.heartbeatSeconds * 1000;
 const OPEN = 1;
@@ -33,10 +34,16 @@ export const SIDE_QUALITY_LABELS = {
 
 /** 연결·heartbeat·서버 시각 보정. status: idle → connecting → ready → (역할별 상태) | offline */
 class RelayClient {
-  constructor(role, { url, WebSocketImpl = globalThis.WebSocket, now = Date.now } = {}) {
+  constructor(role, { url, WebSocketImpl = globalThis.WebSocket,
+    BroadcastChannelImpl = typeof window === 'undefined' ? null : globalThis.BroadcastChannel,
+    connectTimeoutMs = 2000, now = Date.now } = {}) {
     this.role = role;
     this.url = url ?? relayUrl(role);
     this.WebSocketImpl = WebSocketImpl;
+    this.BroadcastChannelImpl = BroadcastChannelImpl;
+    this.connectTimeoutMs = connectTimeoutMs;
+    this.connectTimer = null;
+    this.transport = null;
     this.now = now;
     this.clock = new ClockOffset();
     this.status = 'idle';
@@ -72,20 +79,66 @@ class RelayClient {
     if (this.ws) return;
     this.status = 'connecting';
     this.notice = '';
-    const ws = new this.WebSocketImpl(this.url);
+    this.clock = new ClockOffset();
+    this.lastPingAt = null;
+    this.pingAt = null;
+    this.transport = 'websocket';
+    try {
+      const ws = new this.WebSocketImpl(this.url);
+      this.#attach(ws);
+      // TCP 접속뿐 아니라 프로토콜 hello까지 기다린다. 정적 호스팅의 무응답도 전환한다.
+      this.connectTimer = setTimeout(() => {
+        if (this.ws === ws) this.#fallback(ws);
+      }, this.connectTimeoutMs);
+    } catch {
+      this.#fallback(null);
+    }
+  }
+
+  #attach(ws) {
     this.ws = ws;
     ws.onopen = () => {
+      if (this.ws !== ws) return;
       this.timer = setInterval(() => this.heartbeat(), HEARTBEAT_MS);
     };
-    ws.onmessage = (event) => this.#receive(event.data);
+    ws.onmessage = (event) => {
+      if (this.ws === ws) this.#receive(event.data);
+    };
     ws.onclose = () => {
       if (this.ws !== ws) return;
-      this.#teardown();
-      this.closed();
-      this.emit('change');
+      if (this.transport === 'websocket') this.#fallback(ws);
+      else this.#offline();
     };
-    // 오류 뒤에는 close가 따라온다. 상태 정리는 onclose에서 한다.
-    ws.onerror = () => {};
+    ws.onerror = () => {
+      if (this.ws === ws && this.transport === 'websocket') this.#fallback(ws);
+    };
+  }
+
+  #fallback(ws) {
+    if (this.ws !== ws) return;
+    const hadConnection = this.clock.offset !== null;
+    this.#teardown();
+    ws?.close();
+    // 승인된 연결이 유실됐다면 기존 입력을 폐기하고 새 QR·승인으로만 복구한다.
+    if (hadConnection) this.closed();
+    if (!this.BroadcastChannelImpl) { this.#offline(); return; }
+    this.clock = new ClockOffset();
+    this.lastPingAt = null;
+    this.pingAt = null;
+    this.status = 'connecting';
+    this.transport = 'broadcast';
+    try {
+      this.#attach(new BroadcastRelay(this.role, { BroadcastChannelImpl: this.BroadcastChannelImpl, now: this.now }));
+    } catch {
+      this.#offline();
+    }
+    this.emit('change');
+  }
+
+  #offline() {
+    this.#teardown();
+    this.closed();
+    this.emit('change');
   }
 
   close() {
@@ -108,6 +161,8 @@ class RelayClient {
 
   #teardown() {
     clearInterval(this.timer);
+    clearTimeout(this.connectTimer);
+    this.connectTimer = null;
     this.timer = null;
     this.ws = null;
   }
@@ -126,6 +181,8 @@ class RelayClient {
       return;
     }
     if (msg.type === 'hello') {
+      clearTimeout(this.connectTimer);
+      this.connectTimer = null;
       this.clock.hello(msg.serverTime, this.now());
       this.status = 'ready';
       this.ready();

@@ -85,7 +85,7 @@ npx playwright test --project=desktop --forbid-only
 
 - 사용 순서: PC 첫 화면의 '딥 모드 사용하기'(`/connect`)에서 QR을 띄우고, 휴대폰으로 QR 주소(`/phone?token=…`)를 열어 '연결 요청' → PC '연결 승인' → 휴대폰 '측면 촬영 시작' → PC '카메라 켜기'·'기준 자세 등록'(정면·측면 동시 5초) → '딥 모드 탐지 시작'이다.
 - 휴대폰 카메라는 HTTPS(보안 문맥)에서만 켜진다. 같은 Wi-Fi에서 시험할 때는 `npm run dev --prefix posture-web`의 HTTPS 주소(자체 서명 인증서)를 PC·휴대폰에서 연다.
-- 현재 Vercel 배포는 정적 파일만 제공해 `/relay`가 없다. 공개 HTTPS에서 딥 모드를 쓰려면 Docker 이미지를 WebSocket을 지원하는 실행 환경에 올려야 하며, 아직 정하지 않았다.
+- Vercel 같은 정적 호스팅에서 `/relay` 연결이 실패하거나 2초 동안 접속 응답이 없으면 BroadcastChannel로 자동 전환한다. 같은 브라우저·동일 출처의 PC 탭과 휴대폰 역할 탭(평가용 모의 입력 포함) 사이에서 QR 승인·측면 입력·촬영 종료 확인을 전달한다. 서로 다른 실제 기기의 연결에는 WebSocket 중계가 필요하다. 탭 사이 연결에서도 QR 주소를 열고 PC 승인을 거쳐야 하며, 연결 유실 시 기존 승인을 재사용하지 않는다.
 
 ## 배포 사이트
 

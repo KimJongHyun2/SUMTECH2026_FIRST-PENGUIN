@@ -159,3 +159,112 @@ describe('종료 무응답', () => {
     expect(pc.stop.reason).toBe('timeout');
   });
 });
+
+// 실제 BroadcastChannel로 같은 브라우저의 별도 탭과 같은 메시지 전달을 검증한다.
+describe('서버 없는 환경의 BroadcastChannel 폴백', () => {
+  beforeEach(() => start());
+
+  class FailedSocket {
+    constructor() { queueMicrotask(() => this.onerror?.()); }
+    close() {}
+  }
+  class HangingSocket {
+    constructor() {}
+    close() {}
+  }
+  function local(Link, WebSocketImpl = FailedSocket, extra = {}) {
+    const link = new Link({ url: 'ws://no-relay/relay', WebSocketImpl,
+      BroadcastChannelImpl: BroadcastChannel, connectTimeoutMs: 30, ...extra });
+    links.push(link);
+    link.open();
+    return link;
+  }
+  async function pair() {
+    const pc = local(PcLink);
+    const phone = local(PhoneLink);
+    await until(() => pc.status === 'ready' && phone.status === 'ready', '폴백 준비');
+    pc.issueQr();
+    await until(() => pc.token, 'QR');
+    phone.requestConnect(pc.token);
+    await until(() => pc.status === 'requested' && phone.status === 'pending', '승인 대기');
+    pc.approve();
+    await until(() => pc.linked && phone.status === 'linked', '폴백 연결');
+    return { pc, phone };
+  }
+
+  it('연결 오류 뒤 자동 전환하여 승인·측면 각도·촬영 종료 확인을 전달한다', async () => {
+    const { pc, phone } = await pair();
+    expect(pc.transport).toBe('broadcast');
+    expect(phone.transport).toBe('broadcast');
+    phone.sendSide(SIDE);
+    await until(() => pc.side?.angleDeg === 78, '측면 각도');
+    expect(pc.sideInput(Date.now()).quality).toBe('valid');
+    phone.on((type, id) => { if (type === 'stop') phone.confirmStop(id); });
+    pc.requestStop();
+    await until(() => pc.stop?.status === 'confirmed' && phone.status === 'stopped', '촬영 종료');
+  });
+
+  it('응답 없는 소켓도 연결 제한 시간 뒤 전환한다', async () => {
+    const pc = local(PcLink, HangingSocket);
+    await until(() => pc.status === 'ready', '시간 초과 폴백');
+    expect(pc.transport).toBe('broadcast');
+  });
+
+  it('WebSocket 생성 예외도 폴백하고 미지원이면 offline으로 종료한다', async () => {
+    class ThrowingSocket { constructor() { throw new Error('접속 실패'); } }
+    const pc = local(PcLink, ThrowingSocket);
+    const phone = local(PhoneLink, ThrowingSocket, { BroadcastChannelImpl: null });
+    await until(() => pc.status === 'ready' && phone.status === 'offline', '생성 예외');
+  });
+
+  it('휴대폰 종료 뒤 PC는 유실 처리하고 다른 PC의 QR에는 반응하지 않는다', async () => {
+    const other = local(PcLink);
+    const { pc, phone } = await pair();
+    expect(other.status).toBe('ready');
+    expect(phone.sendSide(SIDE)).toBe(true);
+    await until(() => pc.side, '측면 입력');
+    phone.close();
+    await until(() => pc.status === 'lost', '휴대폰 종료');
+    expect(pc.sideInput(Date.now()).quality).toBe('side_stale');
+  });
+
+  it('PC가 없는 토큰 요청은 무한 대기하지 않고 거절된다', async () => {
+    let now = Date.now();
+    const phone = local(PhoneLink, FailedSocket, { now: () => now });
+    await until(() => phone.status === 'ready', '휴대폰 준비');
+    phone.requestConnect('x'.repeat(24));
+    now += 7000;
+    await until(() => phone.status === 'rejected', '없는 PC 요청 만료');
+    expect(phone.reason).toBe('pc_offline');
+  });
+
+  it('PC 승인 전 거절 및 사용한 QR 재요청을 기존 정책대로 차단한다', async () => {
+    const pc = local(PcLink);
+    const phone = local(PhoneLink);
+    await until(() => pc.status === 'ready' && phone.status === 'ready', '폴백 준비');
+    pc.issueQr();
+    await until(() => pc.token, 'QR');
+    const token = pc.token;
+    expect(phone.sendSide(SIDE)).toBe(false);
+    phone.requestConnect(token);
+    await until(() => pc.status === 'requested', '승인 요청');
+    pc.reject();
+    await until(() => phone.status === 'rejected', '연결 거절');
+    expect(phone.reason).toBe('rejected');
+    const other = local(PhoneLink);
+    await until(() => other.status === 'ready', '다른 휴대폰');
+    other.requestConnect(token);
+    await until(() => other.status === 'rejected', '사용된 QR 거절');
+    expect(other.reason).toBe('used');
+  });
+
+  it('수동 종료한 연결은 늦은 오류로 다시 열리지 않는다', async () => {
+    const pc = local(PcLink, HangingSocket);
+    const ws = pc.ws;
+    pc.close();
+    ws.onerror?.();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(pc.status).toBe('idle');
+    expect(pc.ws).toBeNull();
+  });
+});

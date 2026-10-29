@@ -1,5 +1,5 @@
 // 이전 기록과 비교 (F7). 모드·지표·기준·설정·배치가 같고 세션 중 변경이 없을 때만 정량 비교한다 (docs/prd.md 4절).
-// 조건이 다르거나 확인할 수 없으면 비교하지 않으며, 재등록을 피하도록 유도하지 않는다.
+// 명시된 조건 차이는 비교하지 않는다. 조건을 저장하지 않던 구형 기록은 기본 조건으로 해석한다.
 import { SIDE_LIMITS } from './deep.js';
 import { LIMITS, MODEL_VERSION, PLACEMENT } from './detector.js';
 import { POLICY } from './policy.js';
@@ -38,12 +38,18 @@ export function sessionConditions(camera) {
   };
 }
 
-function condition(session) {
+const DEFAULT_CONDITIONS = sessionConditions({});
+
+function condition(session, other) {
   const { segments, conditions } = session.engine;
-  // 세션 중 설정·기준·모드가 바뀌면 한 조건으로 볼 수 없다. 조건을 남기기 전의 기록은 같은지 확인할 수 없다.
-  if (segments.length !== 1 || !conditions?.metric || !conditions?.placement) return null;
+  // 세션 중 설정·기준·모드가 바뀌면 기본값으로 보완하더라도 한 조건으로 볼 수 없다.
+  if (segments.length !== 1) return null;
   const [seg] = segments;
-  return JSON.stringify([seg.mode, seg.baselineId, seg.settingsVersionId, conditions.metric, conditions.placement]);
+  const metric = conditions?.metric ?? DEFAULT_CONDITIONS.metric;
+  // 구형 기록에는 카메라 정보가 없다. 기본 배치는 비교 상대의 배치로 간주해 하위 호환한다.
+  // 양쪽에 배치가 저장돼 있으면 각각의 값을 유지하므로 명시적인 장치·해상도 차이는 차단한다.
+  const placement = conditions?.placement ?? other.engine.conditions?.placement ?? DEFAULT_CONDITIONS.placement;
+  return JSON.stringify([seg.mode, seg.baselineId, seg.settingsVersionId, metric, placement]);
 }
 
 /** previous가 없거나 어느 쪽이든 유효 시간이 없으면 자료 부족, 조건이 다르면 비교 불가 */
@@ -52,7 +58,7 @@ export function compareSessions(current, previous) {
   const a = totals(current);
   const b = totals(previous);
   if (a.ratio === null || b.ratio === null) return { comparable: false, message: NOT_ENOUGH };
-  const ca = condition(current);
-  if (!ca || ca !== condition(previous)) return { comparable: false, message: NOT_COMPARABLE };
+  const ca = condition(current, previous);
+  if (!ca || ca !== condition(previous, current)) return { comparable: false, message: NOT_COMPARABLE };
   return { comparable: true, current: a, previous: b, ratioChange: a.ratio - b.ratio };
 }

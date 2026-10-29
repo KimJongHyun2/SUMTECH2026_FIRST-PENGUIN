@@ -42,6 +42,7 @@ function connectMessage(link, now) {
       : link.notice;
   }
   if (link.qrExpired(now)) return "QR이 만료됐어요. 'QR 다시 만들기'를 눌러 주세요";
+  if (status === 'issued' && link.transport === 'broadcast') return '탭 사이 연결로 전환했어요. 같은 브라우저의 새 탭에서 아래 QR 주소를 열어 연결을 요청해 주세요';
   if (status === 'issued') return '휴대폰 카메라로 QR을 찍어 연결을 요청해 주세요. QR을 만들기만 해서는 촬영하지 않아요';
   if (status === 'requested') return "휴대폰이 연결을 요청했어요. 내 휴대폰이 맞으면 '연결 승인'을 눌러 주세요";
   if (status === 'lost') return "휴대폰 연결이 끊겼어요. 다시 연결하려면 'QR 다시 만들기'를 누르고 새로 승인해 주세요";
@@ -108,7 +109,7 @@ function liveConnect(now = Date.now()) {
     const left = Math.max(0, Math.ceil((link.expiresAt - link.serverNow(now)) / 1000));
     $('connect-qr-expiry').textContent = `QR 유효 시간 ${left}초 남음`;
   }
-  show($('connect-host-warning'), showQr && LOCAL_HOSTS.includes(location.hostname));
+  show($('connect-host-warning'), showQr && link.transport !== 'broadcast' && LOCAL_HOSTS.includes(location.hostname));
   $('connect-host-warning').textContent = `지금 주소(${location.host})는 휴대폰에서 열 수 없어요. 휴대폰과 같은 네트워크에서 이 PC의 주소(예: https://192.168.0.10:5173)로 이 화면을 다시 열어 주세요`;
   show($('connect-approve'), status === 'requested');
   show($('connect-reject'), status === 'requested');
