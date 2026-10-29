@@ -1,0 +1,100 @@
+{
+  "checked_at": "2026-10-30",
+  "scope": "명세의 가상 입력에 대한 독립 구간 산술 확인이다. 앱 구현·탐지·실제 사용자·자동 리포트 시험이 아니다.",
+  "cases": [
+    {
+      "id": "C01",
+      "description": "중첩 유형의 합집합",
+      "actual": {
+        "valid_seconds": 80,
+        "deviation_seconds": 30,
+        "deviation_percent": 37.5
+      },
+      "expected": {
+        "valid_seconds": 80,
+        "deviation_seconds": 30,
+        "deviation_percent": 37.5
+      },
+      "calculation_check": "기대값 일치"
+    },
+    {
+      "id": "C02",
+      "description": "인식 불가 구간과 이탈의 교집합",
+      "actual": {
+        "valid_seconds": 80,
+        "deviation_seconds": 30,
+        "deviation_percent": 37.5
+      },
+      "expected": {
+        "valid_seconds": 80,
+        "deviation_seconds": 30,
+        "deviation_percent": 37.5
+      },
+      "calculation_check": "기대값 일치"
+    },
+    {
+      "id": "C03",
+      "description": "경계 횡단·확정 이후 개정값 계산",
+      "actual": {
+        "first_seconds": 10,
+        "next_seconds": 10,
+        "first_new_events": 1,
+        "next_new_events": 0
+      },
+      "expected": {
+        "first_seconds": 10,
+        "next_seconds": 10,
+        "first_new_events": 1,
+        "next_new_events": 0
+      },
+      "calculation_check": "기대값 일치"
+    },
+    {
+      "id": "C04",
+      "description": "경계 횡단·확정 이후 개정값 계산",
+      "actual": {
+        "first_seconds": 5,
+        "next_seconds": 10,
+        "first_new_events": 1,
+        "next_new_events": 0
+      },
+      "expected": {
+        "first_seconds": 5,
+        "next_seconds": 10,
+        "first_new_events": 1,
+        "next_new_events": 0
+      },
+      "calculation_check": "기대값 일치"
+    },
+    {
+      "id": "C05",
+      "description": "유효 시간 0",
+      "actual": {
+        "valid_seconds": 0,
+        "deviation_seconds": 0,
+        "deviation_percent": null
+      },
+      "expected": {
+        "valid_seconds": 0,
+        "deviation_seconds": 0,
+        "deviation_percent": null
+      },
+      "calculation_check": "기대값 일치"
+    },
+    {
+      "id": "C06",
+      "description": "정확한 1800초 경계 종료",
+      "actual": {
+        "complete_windows": 1,
+        "partial_windows": 0
+      },
+      "expected": {
+        "complete_windows": 1,
+        "partial_windows": 0
+      },
+      "calculation_check": "기대값 일치"
+    }
+  ],
+  "all_calculation_checks_match": true,
+  "app_e2e_executed": false
+}

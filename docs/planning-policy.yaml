@@ -1,0 +1,22 @@
+# 시간·저장·범위의 공통 설계값. 변경 시 문서 검사로 교차 확인한다.
+version: 2026-10-30-v2
+status: 설계 통합본; 구현·사용성·기기 검증 전
+defaultsStatus: 보완자료의 파일럿 제안값으로 통일. 의학적 기준·검증된 최적값·팀의 개별 승인 이력으로 간주하지 않는다.
+baselineStableSeconds: 5
+deviationSeconds: 10
+recoverySeconds: 3
+rewarningSeconds: 60
+reportValidSeconds: 1800
+retentionDays: 30
+qrExpirySeconds: 120
+heartbeatSeconds: 2
+disconnectSeconds: 6
+phoneStopSeconds: 10
+login: false
+storage: PC의 같은 사이트·브라우저 프로필 IndexedDB (구현안)
+ranking: 후속; 현재 features와 시나리오에서 제외
+deepMode: 선택 경로로 설계 포함; 다중 기기·동기화·재현 검증 대기
+quantitativeComparison: 동일 조건에서만 제공하는 설계안; 조건 차이·자료 부족은 비교 불가
+threshold: 실측으로 정할 항목. 10%·15도 등을 보편 정상선이나 확정 감지값으로 사용하지 않는다.
+warningText: 기준 자세에서 벗어난 상태가 지속되고 있습니다. 자세를 확인해 주세요.
+validationStatus: 문서 구조·참조·가상 집계 산술 검사만 수행; 앱·카메라·E2E·예방 효과 미검증
