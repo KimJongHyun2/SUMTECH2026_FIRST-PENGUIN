@@ -4,7 +4,7 @@
 
 ## 현재 평가 설계의 자료
 
-`front-good.webm`·`front-turtle.webm`·`front-away.webm`은 S1·S7 spec이 `e2e/helpers.ts`에서 getUserMedia를 교체해 재생하는 원본 촬영 영상이다. 평가 빌드(`/?mode=eval`)는 아래 `test-pose.webm`을 쓴다. 처리 규칙은 [PRD 7절](../../docs/prd.md#7-평가-재현-설계), 준비 상태는 [진행 기록](../../progress.md)을 따른다. 공식 키트가 특정 영상 파일명이나 시험 우회를 허용했다는 뜻은 아니다.
+`front-good.webm`·`front-turtle.webm`·`front-away.webm`은 `test-pose.webm`을 만든 원본 촬영 영상이다. `front-good.webm`에는 6~7.5초에 손으로 안경·머리를 만지는 장면이 있어 반복 재생하면 주기적으로 가려진다. 흐름 spec은 평가 빌드(`/?mode=eval`)에서 아래 `test-pose.webm`을 쓴다. 처리 규칙은 [PRD 7절](../../docs/prd.md#7-평가-재현-설계), 준비 상태는 [진행 기록](../../progress.md)을 따른다. 공식 키트가 특정 영상 파일명이나 시험 우회를 허용했다는 뜻은 아니다.
 
 | 파일 | 내용 |
 |---|---|

@@ -1,11 +1,11 @@
 import { expect, test } from "@playwright/test"
-import { fact, numberIn, useRecordedCamera } from "../helpers"
+import { fact, numberIn } from "../helpers"
 
 test("S7 대학생이 직접 만든 로컬 세션을 조회하고 삭제한다", async ({ page }) => {
-  await page.goto("/")
-  await useRecordedCamera(page, "good")
+  // 평가 전용 빌드: '카메라 켜기'가 e2e/fixtures/test-pose.webm의 바른 자세 구간을 공통 판정 경로로 공급한다.
+  await page.goto("/?mode=eval")
 
-  // 1. 첫 화면에서 '자세 등록하고 시작'을 누른다
+  // 1. 평가 전용 빌드의 첫 화면(/?mode=eval)에서 '자세 등록하고 시작'을 누른다
   await page.getByRole("button", { name: "자세 등록하고 시작" }).click()
 
   // 2. 카메라 설정 화면에서 '카메라 켜기'를 누른다
