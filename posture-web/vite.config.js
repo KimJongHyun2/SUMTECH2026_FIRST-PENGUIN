@@ -50,14 +50,12 @@ function lanUrls() {
 export default defineConfig({
   plugins: [basicSsl(), sideAngleRelay(), lanUrls()],
   server: { host: true },
+  // 배포에는 서비스 화면만 넣는다. 실험 도구(lab·front·side·angle.html)는 npm run dev에서만 쓴다.
   build: {
     rollupOptions: {
       input: {
         main: resolve(import.meta.dirname, 'index.html'),
-        lab: resolve(import.meta.dirname, 'lab.html'),
-        front: resolve(import.meta.dirname, 'front.html'),
-        side: resolve(import.meta.dirname, 'side.html'),
-        angle: resolve(import.meta.dirname, 'angle.html'),
+        notFound: resolve(import.meta.dirname, '404.html'),
       },
     },
   },

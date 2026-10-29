@@ -1,0 +1,16 @@
+# 주최 측 실행과 CI가 이 파일로 앱을 띄운다 (loopthon-starter/docker-compose.example.yml 기준).
+# - 서비스 이름 app과 "3000:3000"은 바꾸지 않는다. 앱은 컨테이너 안 0.0.0.0:3000에서 받는다.
+# - 로그인·DB가 없는 서비스라 db와 시드 계정이 없다. 기록은 사용자 브라우저에만 저장한다.
+# - env_file·container_name을 쓰지 않는다. RELEASE_ID·AI_GATEWAY_API_KEY 이름은 바꾸지 않는다.
+services:
+  app:
+    build:
+      context: .
+      args:
+        RELEASE_ID: ${RELEASE_ID:-dev}
+    ports:
+      - "3000:3000"
+    environment:
+      RELEASE_ID: ${RELEASE_ID:-dev}
+      # 현재 AI 호출이 없다. 키가 비어 있어도 앱은 뜬다.
+      AI_GATEWAY_API_KEY: ${AI_GATEWAY_API_KEY:-}
