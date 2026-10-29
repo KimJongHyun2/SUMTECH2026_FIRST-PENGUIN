@@ -1,10 +1,23 @@
-# SUMTECH2026 FIRST-PENGUIN
+# SUMTECH2026 FIRST-PENGUIN — 내 카드 찾기
 
-SUMTECH 2026 루프톤 팀 FIRST-PENGUIN의 서비스 저장소예요.
+내 신분(대학생·군인·직장인 등)과 한 달 지출을 넣으면, 카드마다 **내가 실제로 받을 예상 혜택 금액**을 계산해 나에게 맞는 카드를 추천하는 웹 서비스예요.
 
 - 문제정의·기능 명세: [docs/problem.yaml](docs/problem.yaml)
+- 핵심 사용자 흐름: [docs/scenarios.yaml](docs/scenarios.yaml)
 - 진행 기록: [progress.md](progress.md)
+
+## 구현 설계 (요약)
+
+- 로그인 없음. 입력한 내 정보는 서버에 저장하지 않아요.
+- 카드 정보는 실행 중에 크롤링하지 않고, 대회 기간에 카드사 공개 상품 페이지에서 모은 `data/cards.json`을 앱 시작 시 DB에 시드해요. 카드마다 출처 URL과 정보 확인일을 함께 저장해요.
+- 추천 순위는 규칙으로 계산해요: 자격·종류·연회비로 거르기 → 전월실적 확인 → 예상 월 혜택 = Σ min(분야 지출 × 할인율, 월 한도) → 연간 순혜택 = 월 혜택 × 12 − 연회비 순 정렬.
+- AI(AI Gateway)는 "문장으로 쓴 소비 → 분야별 금액" 변환에만 써요.
 
 ## 설치·실행
 
-(서비스 구현 후 작성 예정. `docker compose up`으로 실행하는 방법을 여기에 적어요.)
+(서비스 구현 후 작성 예정. `docker compose up --build`로 실행하는 방법과 환경변수 표를 여기에 적어요.)
+
+| 환경변수 | 용도 | 설정 위치 |
+|---|---|---|
+| AI_GATEWAY_API_KEY | 문장으로 지출 입력(F3)의 AI 호출 | 로컬 `.env`, 배포 환경변수, GitHub Secrets |
+| RELEASE_ID | `/__health`가 응답하는 배포 commit | 배포·CI |

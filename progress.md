@@ -4,9 +4,11 @@ Agent가 서비스 저장소 루트의 `progress.md`로 복사해 이어 쓴다(
 
 ## 현재 상태
 
-- 실제 서비스 저장소 폴더: C:\Users\jonghyun\github\SUMTECH2026_FIRST-PENGUIN (main, 아직 커밋 없음)
-- 현재 단계 / 다음 행동: 2-A 문제 다지기 진행 중. 준비 파일 첫 commit/push는 학생 PC(VS Code)에서 해야 함(Agent 작업 환경에서 GitHub 접속 불가)
-- 학생에게 확인할 내용: ④영향(비밀번호 찾기 과정·시간·그때 한 말), ②고객, 실제 경험(E1), 현재 대안의 단점. 해법 메모 "모아놔서 보면 되잖아"는 2-B에서 다룸
+- 실제 서비스 저장소 폴더: C:\Users\jonghyun\github\SUMTECH2026_FIRST-PENGUIN (main)
+- 주제 변경(2026-10-29 17:45): "가입 사이트 기억 못함" → **나에게 맞는 카드 추천 서비스**
+- 현재 단계 / 다음 행동: problem.yaml·scenarios.yaml 초안 작성 완료 → 학생이 commit/push → 팀원 경험(E1)·영향 수치 채우기 → 카드 데이터(data/cards.json) 수집 → 최소 화면·docker
+- 결정한 것: 로그인 없음 / platform mobile(초안) / 추천은 규칙 계산, AI는 문장→지출 금액 변환에만 사용 / 실시간 크롤링 안 함(시드 데이터)
+- 학생에게 확인할 내용: experiences(E1), impact(feeling·measurable), 현재 대안의 실제 사용 여부, platform이 mobile이 맞는지, 첫 화면 문구, 시드할 카드 목록(최소 20장, 대학생·군인 전용 포함)
 
 ## 1. GitHub 준비
 
@@ -25,22 +27,22 @@ Agent가 서비스 저장소 루트의 `progress.md`로 복사해 이어 쓴다(
 ## 2. 문제정의 기록 → 문제 다지기 → 해법 찾기 → 기능 명세
 
 - [ ] 종이 기록 수령(학생이 채팅에 옮겨 적거나 사진 첨부)
-- [ ] problem.example.yaml을 참고해 docs/problem.yaml 작성 (초안 생성, 학생 답 대기 칸 다수)
+- [x] problem.example.yaml을 참고해 docs/problem.yaml 작성 (카드 추천 주제로 재작성, 학생 답 대기 칸: experiences·impact·sources·insight)
 - [ ] 원문 의도와 불명확한 내용 확인, 없는 근거는 빈칸 유지
 - [ ] 2-A 문제 다지기: 캔버스 칸을 질문으로 다짐(Agent가 해법·후보·예시 답을 먼저 내지 않음, 학생 답이 없는 칸은 "학생 답 대기")
 - [ ] 팀원 경험을 언제·어떤 장면·어떻게 대응했는지까지 experiences에 기록
 - [ ] 외부 자료는 열리는 URL을 sources에 그대로 적고 원문이 주장을 직접 뒷받침하는지 확인, 출처 없는 수치 없음
 - [ ] 문제가 '우리 기능이 없어서'가 아니라 실제 상황·행동으로 서술됐는지 확인
-- [ ] 2-B 해법 찾기: 학생이 낸 해법과 결정을 solution_paths에, 기존 대안 대신 이 해법이어야 하는 이유를 학생 말로 why_ours에 작성
-- [ ] 2-C features에 학생이 고른 해법의 기능별 입력·결과·완료 조건 작성
+- [x] 2-B 해법 찾기(초안): 학생이 낸 해법과 결정을 solution_paths에, 기존 대안 대신 이 해법이어야 하는 이유를 학생 말로 why_ours에 작성
+- [x] 2-C features(F1~F7)에 학생이 고른 해법의 기능별 입력·결과·완료 조건 작성
 - [ ] YAML 문법 검사, 등록된 레포의 기본 브랜치에 docs/problem.yaml push
 - [ ] 학생이 개인 로그인으로 우리 팀 → 문제 정의를 열어 캔버스 표시 확인(Agent는 화면을 열 수 없음, 약 1분 캐시)
 - [ ] 핵심 사용자 흐름·기능별 동작 규칙·완료 조건·제외 범위를 팀과 확인
-- [ ] 로그인 필요 여부와 역할 이름(흐름 account·docker 시드 계정 역할 이름으로 씀) 결정
+- [x] 로그인 필요 여부(없음)와 역할 이름(흐름 account·docker 시드 계정 역할 이름으로 씀) 결정
 - [ ] 첫 화면에서 알려 줄 것(로그인하지 않은 사람이 `/`에서 볼 서비스 이름·하는 일)을 학생과 정함
 - [ ] 주 사용 플랫폼(desktop·mobile·both)과 실제 사용 장면에 근거한 platformReason 작성
-- [ ] 사용자 핵심 흐름 3~8개를 scenarios.example.yaml 참고해 docs/scenarios.yaml에 작성(steps는 화면의 메뉴·버튼 이름으로 한 줄에 한 동작, 로그인 흐름은 account 지정), YAML 파서로 형식 확인 후 기본 브랜치 push
-- [ ] 서비스의 AI 호출 필요 여부 확인
+- [x] 사용자 핵심 흐름 7개(S1~S7)를 scenarios.example.yaml 참고해 docs/scenarios.yaml에 작성(steps는 화면의 메뉴·버튼 이름으로 한 줄에 한 동작, 로그인 흐름은 account 지정), YAML 파서로 형식 확인 후 기본 브랜치 push
+- [x] 서비스의 AI 호출 필요 여부 확인(F3에서 사용)
 - [ ] README 등 기존 문서에 확인된 구현 설계 기록, 기본 브랜치 push
 - 문제정의·구현 설계 링크 / commit SHA / 확인할 빈칸:
 
