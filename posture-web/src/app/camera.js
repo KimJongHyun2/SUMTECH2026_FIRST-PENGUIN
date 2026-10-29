@@ -1,6 +1,6 @@
 // PC 정면 카메라: 켜기·끄기, 한 프레임 분석, 미리보기. 영상은 이 기기에서만 처리하고 저장하지 않는다.
 import { createFace, createPose, startCamera } from '../vision.js';
-import { POSE, frontSignals, pitchFromMatrix } from '../signals.js';
+import { POSE, frontSignals, largestPose, pitchFromMatrix } from '../signals.js';
 
 // 영상 프레임이 이 시간 이상 바뀌지 않으면 입력 갱신 중단(인식 불가)으로 본다.
 const FROZEN_MS = 1500;
@@ -55,8 +55,9 @@ export class FrontCamera {
     }
 
     const [pose, face] = this.models;
-    const landmarks = pose.detectForVideo(v, now).landmarks?.[0];
-    const matrix = face.detectForVideo(v, now).facialTransformationMatrixes?.[0]?.data;
+    const landmarks = largestPose(pose.detectForVideo(v, now).landmarks);
+    const faces = face.detectForVideo(v, now);
+    const matrix = faces.facialTransformationMatrixes?.[largestFaceIndex(faces.faceLandmarks)]?.data;
     const signals = landmarks ? frontSignals(landmarks, v.videoWidth, v.videoHeight) : null;
     return {
       landmarks,
@@ -87,6 +88,21 @@ export class FrontCamera {
     dot(POSE.L_SHOULDER, '#4f8fe4');
     dot(POSE.R_SHOULDER, '#4f8fe4');
   }
+}
+
+/** 화면에서 가장 넓게 보이는(가장 가까운) 얼굴의 번호. 없으면 -1 */
+function largestFaceIndex(faces = []) {
+  let best = -1;
+  let bestWidth = -1;
+  faces.forEach((points, i) => {
+    const xs = points.map((p) => p.x);
+    const width = Math.max(...xs) - Math.min(...xs);
+    if (width > bestWidth) {
+      best = i;
+      bestWidth = width;
+    }
+  });
+  return best;
 }
 
 export function cameraErrorMessage(error) {

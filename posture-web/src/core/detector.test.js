@@ -12,6 +12,24 @@ describe('frameQuality (F4)', () => {
     expect(frameQuality(s(0.3, 0.7, 0, 0.2))).toBe('unrecognized');
     expect(frameQuality(s(0.3, 0.7, 0))).toBe('valid');
   });
+
+  const at = (shoulder_w, center_x = 0.52, center_y = 0.77) => ({ ...s(0.33, 0.75, 0), shoulder_w, center_x, center_y });
+  const placement = { shoulder_w: 0.43, center_x: 0.52, center_y: 0.77 };
+
+  it('자리를 비웠을 때 뒤쪽에서 작게 잡힌 다른 사람은 자리 비움 (p1 녹화: 0.01)', () => {
+    expect(frameQuality(at(0.011, 0.75, 0.8))).toBe('away');
+    expect(frameQuality(at(0.011, 0.75, 0.8), placement)).toBe('away');
+  });
+
+  it('기준 등록 때와 같은 자리·크기면 유효, 이탈로 가까워진 정도(p1: 0.50)도 유효', () => {
+    expect(frameQuality(at(0.43), placement)).toBe('valid');
+    expect(frameQuality(at(0.497, 0.54, 0.76), placement)).toBe('valid');
+  });
+
+  it('크기나 위치가 기준과 크게 다르면 인식 불가', () => {
+    expect(frameQuality(at(0.2), placement)).toBe('unrecognized');
+    expect(frameQuality(at(0.43, 0.85), placement)).toBe('unrecognized');
+  });
 });
 
 describe('evaluateFrame (p1 T1 평균 변화량)', () => {

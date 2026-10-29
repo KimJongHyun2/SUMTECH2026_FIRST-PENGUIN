@@ -12,7 +12,15 @@ export function baselineRecord(features, now) {
   return {
     id: newId('b'),
     createdAt: now,
-    features: { head_forward: features.head_forward, neck_len: features.neck_len, pitch_deg: features.pitch_deg },
+    features: {
+      head_forward: features.head_forward,
+      neck_len: features.neck_len,
+      pitch_deg: features.pitch_deg,
+      // 등록 때의 배치: 이후 같은 자리·크기인지 확인하는 데 쓴다.
+      shoulder_w: features.shoulder_w,
+      center_x: features.center_x,
+      center_y: features.center_y,
+    },
     camera: { label: camera.label, ...camera.size },
     modelVersion: MODEL_VERSION,
     kind: 'front',

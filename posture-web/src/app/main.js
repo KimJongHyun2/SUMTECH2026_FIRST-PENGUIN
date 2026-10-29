@@ -22,7 +22,8 @@ function tick() {
   const now = Date.now();
   if (camera.on) {
     const frame = camera.analyze();
-    const quality = frameQuality(frame.sample);
+    // 기준 등록 중이 아니면 기준 등록 때와 같은 자리·크기인지도 확인한다.
+    const quality = frameQuality(frame.sample, app.registration ? null : app.baseline?.features);
     if (quality === 'valid') {
       app.recent.push(frame.sample);
       if (app.recent.length > SMOOTH_FRAMES) app.recent.shift();

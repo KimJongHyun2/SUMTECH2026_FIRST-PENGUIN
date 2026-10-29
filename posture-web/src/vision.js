@@ -12,7 +12,8 @@ export async function createPose() {
   return PoseLandmarker.createFromOptions(await fileset(), {
     baseOptions: { modelAssetPath: POSE_MODEL, delegate: 'GPU' },
     runningMode: 'VIDEO',
-    numPoses: 1,
+    // 뒤쪽의 다른 사람이 함께 잡혀도 가장 가까운 사람을 고를 수 있게 여러 명을 찾는다.
+    numPoses: 3,
   });
 }
 
@@ -20,7 +21,7 @@ export async function createFace() {
   return FaceLandmarker.createFromOptions(await fileset(), {
     baseOptions: { modelAssetPath: FACE_MODEL, delegate: 'GPU' },
     runningMode: 'VIDEO',
-    numFaces: 1,
+    numFaces: 3,
     outputFacialTransformationMatrixes: true,
   });
 }

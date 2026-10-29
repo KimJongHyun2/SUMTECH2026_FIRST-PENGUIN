@@ -25,7 +25,25 @@ export function frontSignals(pose, w, h) {
     shoulder_tilt: (ls.y - rs.y) / shoulderWidth,                        // ④ 0에서 멀수록 기울어짐
     ear_vis: Math.min(le.v, re.v),
     shoulder_vis: Math.min(ls.v, rs.v),
+    // 배치: 화면 대비 크기·위치. 내 자리의 사람인지(뒤쪽의 다른 사람이 아닌지) 확인하는 데 쓴다.
+    shoulder_w: shoulderWidth / w,
+    center_x: (ls.x + rs.x) / 2 / w,
+    center_y: (ls.y + rs.y) / 2 / h,
   };
+}
+
+/** 여러 사람이 잡히면 화면에서 어깨가 가장 넓은(카메라에 가장 가까운) 사람을 고른다. */
+export function largestPose(poses) {
+  let best = null;
+  let bestWidth = -1;
+  for (const pose of poses ?? []) {
+    const width = Math.abs(pose[POSE.L_SHOULDER].x - pose[POSE.R_SHOULDER].x);
+    if (width > bestWidth) {
+      best = pose;
+      bestWidth = width;
+    }
+  }
+  return best;
 }
 
 /**

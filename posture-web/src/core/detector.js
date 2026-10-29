@@ -7,12 +7,28 @@ export const MODEL_VERSION = 'pose_landmarker_lite/float16/1+face_landmarker/flo
 export const LIMITS = Object.freeze({ headForward: 0.025, neckLen: 0.035, pitch: 20 });
 const MIN_VISIBILITY = 0.5;
 
-export const SIGNAL_KEYS = ['head_forward', 'neck_len', 'pitch_deg'];
+// 배치 확인. 노트북 앞에 앉은 사용자는 어깨가 화면 폭의 약 40%를 차지했고(p1 녹화),
+// 자리를 비웠을 때 뒤쪽에서 잡힌 다른 사람은 2% 이하였다. 경계는 실측 대상인 파일럿 값이다.
+export const PLACEMENT = Object.freeze({ minShoulderWidth: 0.12, sizeRatio: [0.6, 1.6], maxCenterShift: 0.2 });
 
-/** 'valid' | 'away'(사람이 안 보임) | 'unrecognized'(필수 지점 품질 부족) */
-export function frameQuality(sample) {
+export const SIGNAL_KEYS = ['head_forward', 'neck_len', 'pitch_deg'];
+const PLACEMENT_KEYS = ['shoulder_w', 'center_x', 'center_y'];
+
+/**
+ * 'valid' | 'away'(내 자리에 사람이 없음) | 'unrecognized'(필수 지점 품질 부족·기준과 다른 배치)
+ * placement를 주면 기준 등록 때와 같은 자리·크기인지도 확인한다.
+ */
+export function frameQuality(sample, placement = null) {
   if (!sample) return 'away';
+  if (typeof sample.shoulder_w === 'number' && sample.shoulder_w < PLACEMENT.minShoulderWidth) return 'away';
   if (!(sample.ear_vis >= MIN_VISIBILITY) || !(sample.shoulder_vis >= MIN_VISIBILITY)) return 'unrecognized';
+  if (placement?.shoulder_w && typeof sample.shoulder_w === 'number') {
+    const ratio = sample.shoulder_w / placement.shoulder_w;
+    const shift = Math.hypot(sample.center_x - placement.center_x, sample.center_y - placement.center_y);
+    if (ratio < PLACEMENT.sizeRatio[0] || ratio > PLACEMENT.sizeRatio[1] || shift > PLACEMENT.maxCenterShift) {
+      return 'unrecognized';
+    }
+  }
   return 'valid';
 }
 
@@ -21,7 +37,7 @@ export function averageSamples(samples) {
   const valid = samples.filter((s) => frameQuality(s) === 'valid');
   if (!valid.length) return null;
   const avg = { ear_vis: 1, shoulder_vis: 1 };
-  for (const key of SIGNAL_KEYS) {
+  for (const key of [...SIGNAL_KEYS, ...PLACEMENT_KEYS]) {
     const values = valid.map((s) => s[key]).filter((v) => typeof v === 'number');
     avg[key] = values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
   }
@@ -30,7 +46,7 @@ export function averageSamples(samples) {
 
 /** 기준 대비 이탈 여부와 유형. 유형은 기록용이며 사용자에게는 공통 경고만 보인다. */
 export function evaluateFrame(sample, baseline) {
-  const quality = frameQuality(sample);
+  const quality = frameQuality(sample, baseline);
   if (quality !== 'valid' || !baseline) return { quality, deviated: false, types: [] };
   const types = [];
   if (sample.head_forward - baseline.head_forward >= LIMITS.headForward) types.push('head_forward');
