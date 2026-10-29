@@ -6,6 +6,7 @@ import { $, show } from './format.js';
 import './views/history.js';
 import './views/report.js';
 import './views/setup.js';
+import { initTools } from './views/tools.js';
 import { sessionTick } from './views/watch.js';
 
 const TICK_MS = 400;
@@ -37,6 +38,7 @@ function tick() {
     app.frame = { quality: 'away', faceFound: false, sample: null, smoothed: null };
   }
   if (app.session) sessionTick(now);
+  app.replay?.tick(now, app.session);
   renderLive(now);
 }
 
@@ -79,6 +81,7 @@ async function init() {
     console.error(error);
     app.storageError = '기록을 저장할 수 없는 브라우저 상태예요. 기록·기준이 저장되지 않을 수 있어요.';
   }
+  initTools();
   startTicker();
   route(location.pathname);
 }

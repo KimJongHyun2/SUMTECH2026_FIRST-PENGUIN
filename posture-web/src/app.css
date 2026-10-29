@@ -103,4 +103,5 @@ a { color: inherit; }
 
 .session-list { list-style: none; padding: 0; margin: 0 0 12px; display: grid; gap: 8px; }
 .session-item { width: 100%; text-align: left; border-radius: 12px; }
+.test-tools { border: 2px dashed var(--muted); border-radius: 12px; padding: 12px; margin-top: 16px; }
 .confirm { border: 2px solid var(--error); border-radius: 12px; padding: 16px; margin: 12px 0; }

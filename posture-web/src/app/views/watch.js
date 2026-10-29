@@ -2,7 +2,7 @@
 import { evaluateFrame } from '../../core/detector.js';
 import { RECOGNITION_LABELS, SESSION_STATE_LABELS, SessionEngine } from '../../core/engine.js';
 import { DEFAULT_SETTINGS, SENSITIVITY, WARNING_TEXT, sameSettings, validateSettings, withDefaults } from '../../core/policy.js';
-import { app, camera, navigate, newId, onLive, onView, placeCamera, saveSession } from '../ctx.js';
+import { app, camera, navigate, newId, onLive, onView, placeCamera, recorded, saveSession } from '../ctx.js';
 import { $, clock, dateTime, show } from '../format.js';
 import { beep } from '../sound.js';
 import { beginRegistration, turnOnCamera } from './setup.js';
@@ -36,6 +36,13 @@ export async function startSession(now, mode = 'basic') {
   app.session = engine;
   reportReady = false;
   saveStatus = null;
+  app.replay = null;
+  // 평가 모드: 녹화 입력과 미리 누른 리포트 가속을 테스트 기록으로 남긴다 (docs/prd.md 7절).
+  if (recorded) engine.markTest('녹화 정면 입력');
+  if (app.reportAccelPending) {
+    engine.accelerateFirstReport(now, app.reportAccelPending);
+    app.reportAccelPending = null;
+  }
   handle(engine.start(now));
   resetPanels();
   await saveSession(now);
@@ -263,6 +270,10 @@ function renderWatch() {
   $('watch-posture').textContent = postureText(session);
   $('watch-valid').textContent = clock(session.validMs);
   $('watch-candidate').textContent = session.candidateMs > 0 ? `${Math.floor(session.candidateMs / 1000)}초` : '-';
+  const cycle = (session.nextBoundary - session.windowStart) / 1000;
+  const accelerated = session.reportAccel && !session.reportAccel.released;
+  $('watch-next-report').textContent = ended ? '-'
+    : `유효 ${clock(session.nextBoundary)} (주기 ${cycle}초${accelerated ? ' · 테스트 가속' : ''})`;
 
   const warning = session.warningActive;
   show($('watch-warning'), warning);

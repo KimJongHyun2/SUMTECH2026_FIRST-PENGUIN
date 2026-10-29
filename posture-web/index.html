@@ -9,6 +9,7 @@
 <body>
   <header class="top">
     <a class="logo" href="/" data-link>🐢 패스트거북이</a>
+    <span class="badge" id="eval-badge" hidden>평가 모드 · 녹화 입력</span>
     <a class="muted" href="/history" data-link>내 기록</a>
   </header>
 
@@ -60,6 +61,7 @@
         <div><dt>기록 분석</dt><dd id="setup-analysis">-</dd></div>
         <div><dt>현재 배치</dt><dd id="setup-placement">카메라를 켜서 확인이 필요해요</dd></div>
       </dl>
+      <div id="setup-tools"></div>
     </section>
 
     <!-- /watch 감지 화면 -->
@@ -87,7 +89,9 @@
           <div><dt>기준</dt><dd id="watch-baseline">-</dd></div>
           <div><dt>유효 감지 시간</dt><dd id="watch-valid">00:00</dd></div>
           <div><dt>이탈 확인 중</dt><dd id="watch-candidate">-</dd></div>
+          <div><dt>다음 자동 리포트</dt><dd id="watch-next-report">-</dd></div>
         </dl>
+        <div id="watch-tools"></div>
       </div>
 
       <div class="card" id="settings-panel" hidden>
@@ -207,6 +211,20 @@
     개인 기준 대비 자세 변화를 알려주는 예방 목적의 자세 관리 도우미예요. 기준 자세는 의학적 정상 판정이 아니며 진단·치료를 제공하지 않아요.
     기록은 로그인 없이 이 PC 브라우저에만 저장되며, 공유 PC의 다른 이용자에게서 보호되지 않아요.
   </footer>
+
+  <!-- 평가 전용 빌드(/?mode=eval)에서만 보이는 테스트 도구. 입력·연결·리포트 주기만 대신한다 (docs/prd.md 7절) -->
+  <div class="test-tools" id="test-tools" hidden>
+    <button class="btn" id="test-tools-toggle" aria-expanded="false" aria-controls="test-tools-body">테스트 도구</button>
+    <div id="test-tools-body" hidden>
+      <p class="muted small">평가 전용 빌드에서만 보여요. 녹화 입력·연결·리포트 주기만 대신하고, 결과는 실제 판정·집계로 만들어요.</p>
+      <div class="actions">
+        <button class="btn" id="tt-accel">[테스트용] 리포트 3초 가속</button>
+        <button class="btn" id="tt-front">[테스트용] 정면 이탈·복귀 재생</button>
+        <button class="btn" id="tt-away">[테스트용] 자리 비움·재이탈 재생</button>
+      </div>
+      <p class="status-line" id="test-tools-status" aria-live="polite"></p>
+    </div>
+  </div>
 
   <div class="cam-box" id="cam-box" hidden>
     <canvas id="preview" width="640" height="480" aria-label="카메라 미리보기"></canvas>
