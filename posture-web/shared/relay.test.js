@@ -278,6 +278,17 @@ describe('측면 입력 전달·검증', () => {
     expect(all(pc, 'qr.issued')).toHaveLength(0);
   });
 
+  it.each(['__defineGetter__', '__lookupGetter__', 'constructor', 'toString', 'hasOwnProperty', '__proto__', 'valueOf'])(
+    '상속 속성 이름(%s)은 처리기로 쓰지 않고 형식 오류로 거부한다',
+    (type) => {
+      for (const role of ['pc', 'phone']) {
+        const client = join(role);
+        expect(() => send(client, { type })).not.toThrow();
+        expect(last(client, 'error').code).toBe('bad_message');
+      }
+    },
+  );
+
   it('초당 20개를 넘게 보내면 끊는다', () => {
     const pc = join('pc');
     for (let i = 0; i < 21; i += 1) send(pc, { type: 'ping' });
@@ -455,6 +466,15 @@ describe('WebSocket /relay (실제 연결)', () => {
   it('다른 사이트에서 연 페이지와 잘못된 역할은 연결하지 않는다', async () => {
     await expect(open('pc', { Origin: 'https://evil.example' })).rejects.toThrow('403');
     await expect(open('admin')).rejects.toThrow('403');
+  });
+
+  it('__defineGetter__ 메시지는 오류로 답하고 같은 연결을 계속 쓸 수 있다', async () => {
+    const pc = await open('pc');
+    pc.send(JSON.stringify({ type: '__defineGetter__' }));
+    expect((await next(pc, 'error')).code).toBe('bad_message');
+    pc.send(JSON.stringify({ type: 'ping' }));
+    expect(await next(pc, 'pong')).toBeTruthy();
+    pc.close();
   });
 
   it('휴대폰 소켓이 끊기면 PC에 연결 유실을 알리고 자원을 정리한다', async () => {

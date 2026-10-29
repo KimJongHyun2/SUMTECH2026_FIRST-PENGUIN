@@ -107,7 +107,9 @@ export class ConnectionHub {
       this.#error(client, 'bad_message');
       return;
     }
-    const handler = (client.role === 'pc' ? this.#pcHandlers : this.#phoneHandlers)[msg.type];
+    // 처리기 객체가 직접 가진 이름만 인정한다. '__defineGetter__'·'constructor' 같은 상속 속성을 호출하면 서버가 죽는다.
+    const handlers = client.role === 'pc' ? this.#pcHandlers : this.#phoneHandlers;
+    const handler = Object.hasOwn(handlers, msg.type) ? handlers[msg.type] : null;
     if (msg.type === 'ping') this.#send(client, { type: 'pong', serverTime: t });
     else if (handler) handler.call(this, client, msg, t);
     else this.#error(client, 'bad_message');
