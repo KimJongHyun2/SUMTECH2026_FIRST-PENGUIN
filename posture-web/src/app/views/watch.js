@@ -180,17 +180,13 @@ $('rebaseline-register').onclick = async () => {
   });
 };
 
+// '탐지 재개'도 누른 뒤 새 기준과 같은 배치의 유효 입력이 확인되면 이어서 시작한다(재개와 같은 확인 흐름).
 $('rebaseline-resume').onclick = () => {
-  if (app.frame.quality !== 'valid') {
-    $('rebaseline-msg').textContent = '얼굴과 양쪽 어깨가 보이게 앉은 뒤 다시 눌러 주세요';
-    return;
-  }
-  const now = Date.now();
-  handle(app.session.start(now));
   show($('rebaseline-panel'), false);
-  $('watch-msg').textContent = '새 기준으로 탐지를 재개했어요';
+  app.resuming = true;
+  app.placementSince = null;
+  $('watch-msg').textContent = '기준·배치를 확인하고 있어요. 확인되면 새 기준으로 탐지를 재개해요';
   placeCamera();
-  saveSession(now);
 };
 
 function openReport() {
@@ -234,6 +230,7 @@ function renderWatch() {
   $('watch-session').textContent = session.id;
   $('watch-state').textContent = SESSION_STATE_LABELS[session.state];
   $('watch-mode').textContent = MODE_LABELS[session.mode];
+  $('watch-baseline').textContent = session.currentSegment.baselineId;
   $('watch-recognition').textContent = session.state === 'running' ? RECOGNITION_LABELS[session.recognition] : '-';
   $('watch-valid').textContent = clock(session.validMs);
   $('watch-candidate').textContent = session.candidateMs > 0 ? `${Math.floor(session.candidateMs / 1000)}초` : '-';
