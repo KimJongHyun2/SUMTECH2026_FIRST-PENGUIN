@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>평가 입력 구간 확인</title>
+</head>
+<body>
+  <!--
+    개발 서버 전용(빌드에 넣지 않음). EVAL_ENABLED=true npm run dev 뒤 이 페이지를 열면
+    e2e/fixtures/test-pose.webm의 각 구간을 앱과 같은 추론·판정 코드로 확인해 결과 JSON을 보여 준다.
+    e2e/tools/verify-test-pose.mjs가 이 결과로 구간 명세(test-pose.manifest.json)의 verified를 채운다.
+  -->
+  <video id="video" muted playsinline></video>
+  <pre id="out">확인 중…</pre>
+  <script type="module" src="./verify-eval-input.js"></script>
+</body>
+</html>

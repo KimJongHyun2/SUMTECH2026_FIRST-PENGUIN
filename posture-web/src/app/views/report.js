@@ -40,6 +40,7 @@ function reportCard(report) {
   card.append(el('h3', null, reportTitle(report)));
 
   const badges = [];
+  if (report.test?.length) badges.push(`테스트 기록 (${report.test.join(', ')})`);
   if (m.provisional) badges.push('일부 자세 구간 확인 중');
   if (report.revision > 1) badges.push(`개정 ${report.revision} · ${dateTime(report.updatedAt)} 갱신`);
   if (badges.length) card.append(el('p', 'badge', badges.join(' · ')));
@@ -64,6 +65,18 @@ function reportCard(report) {
     ['판정 보류', holds],
   ]);
   card.append(facts);
+
+  // 딥 모드가 있었던 구간은 모드별로 나눠 보여 준다. 모드 간 비율 차이를 개선 효과로 쓰지 않는다.
+  const modes = Object.entries(m.modes ?? {});
+  if (modes.some(([mode]) => mode !== 'basic')) {
+    const byMode = el('dl', 'facts');
+    byMode.setAttribute('aria-label', '모드별 결과');
+    renderFacts(byMode, modes.map(([mode, x]) => [
+      MODE_LABELS[mode],
+      `유효 ${seconds(x.validSeconds)} · 이탈 ${seconds(x.deviationSeconds)} · 비율 ${percent(x.ratio)}`,
+    ]));
+    card.append(el('p', 'muted small', '모드별 결과 (서로 다른 모드의 비율은 비교하지 않아요)'), byMode);
+  }
 
   if (m.events.length) {
     const list = el('ul', 'event-list');
