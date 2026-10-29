@@ -115,6 +115,14 @@ export const REPLAYS = {
       { clip: 'good', label: '복귀 3초', done: (s) => !s.warningActive },
     ],
   },
+  // 딥 모드: 정면 녹화 구간을 바꾸면 테스트 휴대폰(SimPhone)의 측면 입력도 같은 자세로 바뀐다.
+  both: {
+    name: '양쪽 이탈·복귀 재생',
+    steps: [
+      { clip: 'turtle', label: '이탈 10초', done: (s) => s.warningActive },
+      { clip: 'good', label: '복귀 3초', done: (s) => !s.warningActive },
+    ],
+  },
   away: {
     name: '자리 비움·재이탈 재생',
     steps: [
@@ -125,6 +133,84 @@ export const REPLAYS = {
     ],
   },
 };
+
+// 정면 녹화 구간별 측면 입력. 측면 영상이 없어 같은 자세의 측면 특징값을 정해 둔 것이다(실측 아님).
+const SIDE_BY_CLIP = {
+  good: { valid: true, angleDeg: 75 },
+  brief_touch: { valid: true, angleDeg: 75 },
+  turtle: { valid: true, angleDeg: 63 },
+  away: { valid: false, angleDeg: null },
+};
+const SIDE_EVERY_MS = 400;
+
+/**
+ * '[테스트용] 측면 데이터 주입'의 테스트 휴대폰 1대. 실제 휴대폰과 같은 연결 서버(/relay?role=phone)에
+ * 같은 메시지로 연결 요청·측면 입력·종료 응답을 보낸다. PC 승인·판정·집계는 공통 경로가 한다.
+ * silence()는 '[테스트용] 측면 연결 끊기': 입력·응답을 모두 멈춰 서버가 입력 중단·연결 유실을 판정하게 한다.
+ */
+export class SimPhone {
+  constructor(clipLabel, relayUrl) {
+    this.clipLabel = clipLabel;
+    this.relayUrl = relayUrl;
+    this.status = 'idle'; // idle | requested | linked | stopped | silent | rejected
+    this.seq = 0;
+  }
+
+  start(token) {
+    const ws = new WebSocket(this.relayUrl);
+    this.ws = ws;
+    ws.onmessage = (event) => this.#receive(JSON.parse(event.data), token);
+  }
+
+  #send(message) {
+    if (this.status !== 'silent' && this.ws?.readyState === 1) this.ws.send(JSON.stringify(message));
+  }
+
+  #receive(m, token) {
+    if (this.status === 'silent') return;
+    if (m.type === 'hello') {
+      this.offset = m.serverTime - Date.now();
+      this.#send({ type: 'connect.request', token });
+      this.status = 'requested';
+    } else if (m.type === 'connect.rejected') {
+      this.status = 'rejected';
+    } else if (m.type === 'link.approved') {
+      this.status = 'linked';
+      this.timer = setInterval(() => this.#sendSide(), SIDE_EVERY_MS);
+    } else if (m.type === 'stop.request') {
+      // 모의 종료 응답: 테스트 휴대폰은 촬영 장치가 없으므로 입력 전송을 멈춘 뒤 확인을 보낸다.
+      clearInterval(this.timer);
+      this.#send({ type: 'stop.done', stopId: m.stopId });
+      this.status = 'stopped';
+    } else if (m.type === 'link.revoked' || m.type === 'link.closed') {
+      clearInterval(this.timer);
+    }
+  }
+
+  #sendSide() {
+    const side = SIDE_BY_CLIP[this.clipLabel()] ?? SIDE_BY_CLIP.good;
+    this.seq += 1;
+    this.#send({
+      type: 'side',
+      seq: this.seq,
+      t: Date.now() + this.offset,
+      valid: side.valid,
+      angleDeg: side.angleDeg,
+      earVis: side.valid ? 0.9 : 0.1,
+      shoulderVis: side.valid ? 0.9 : 0.1,
+    });
+  }
+
+  silence() {
+    clearInterval(this.timer);
+    this.status = 'silent';
+  }
+
+  close() {
+    clearInterval(this.timer);
+    this.ws?.close();
+  }
+}
 
 export class Replay {
   constructor(kind, show) {

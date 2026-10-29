@@ -1,7 +1,8 @@
 // 평가 전용 빌드의 '테스트 도구' (docs/prd.md 7절). 설정·감지·딥 연결 화면 아래에 같은 도구를 옮겨 붙인다.
 // 버튼은 녹화 입력·리포트 주기만 바꾸고, 경고·복귀·리포트는 공통 엔진이 만든다.
-import { REPLAYS, Replay } from '../eval.js';
-import { EVAL, app, onLive, onRoute, recorded, saveSession } from '../ctx.js';
+import { relayUrl } from '../deeplink.js';
+import { REPLAYS, Replay, SimPhone } from '../eval.js';
+import { EVAL, app, link, onLive, onRoute, recorded, saveSession } from '../ctx.js';
 import { $, show } from '../format.js';
 
 const SLOTS = { '/setup': 'setup-tools', '/watch': 'watch-tools', '/connect': 'connect-tools' };
@@ -52,6 +53,37 @@ function startReplay(kind) {
 
 $('tt-front').onclick = () => startReplay('front');
 $('tt-away').onclick = () => startReplay('away');
+
+// 테스트 휴대폰 1대가 실제 연결 서버에 휴대폰 역할로 연결을 요청한다. PC 승인은 화면의 '연결 승인'으로 한다.
+$('tt-side').onclick = () => {
+  if (!link.qr || link.linked || link.request) {
+    message = '연결 화면에 유효한 QR이 있고 대기 중일 때 쓸 수 있어요';
+    return;
+  }
+  app.simPhone?.close();
+  app.simPhone = new SimPhone(() => recorded.segment?.label, relayUrl('phone'));
+  app.simPhone.start(link.qr.token);
+  message = '테스트 휴대폰 1대가 연결을 요청했어요 (측면 모의 입력). PC에서 승인해 주세요';
+};
+
+$('tt-both').onclick = () => {
+  if (app.session?.mode !== 'deep') {
+    message = '딥 모드 탐지 중일 때 쓸 수 있어요';
+    return;
+  }
+  startReplay('both');
+};
+
+// 측면 입력·연결 신호·종료 응답을 모두 멈춘다. 끊김 판정은 서버·PC가 실제 시간으로 한다.
+$('tt-disconnect').onclick = () => {
+  if (!app.simPhone || !link.linked) {
+    message = '테스트 휴대폰이 연결돼 있을 때 쓸 수 있어요';
+    return;
+  }
+  app.simPhone.silence();
+  app.session?.markTest('측면 연결 끊기');
+  message = '테스트 휴대폰의 측면 입력·연결 신호·종료 응답을 끊었어요';
+};
 
 onRoute(place);
 onLive(() => {
