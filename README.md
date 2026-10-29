@@ -44,7 +44,7 @@ npm run build --prefix posture-web
 | `AI_GATEWAY_API_KEY` | 향후 서버 AI 호출에 쓰는 비밀키이다. 현재 서비스는 Gateway를 호출하지 않는다. | 필요할 때 서버·배포 환경과 GitHub Secrets에 직접 설정한다. |
 | `PORT` | 로컬 Node 서버 포트이다. Docker의 app은 3000을 사용한다. | 로컬 실행 환경이다. |
 | `E2E_BASE_URL` | 로컬 E2E가 접속하는 앱 주소이다. 주최 측 주소는 실행 환경이 정한다. | E2E 실행 환경이다. |
-| `EVAL_ENABLED` | PRD의 평가용 빌드를 위한 제안된 설정이다. 아직 구현·배포 연결 전이다. | 구현 후 빌드 단계에 연결할 항목이다. 현재 이 값만 넣어도 켜지지 않는다. |
+| `EVAL_ENABLED` | `true`로 빌드하면 평가 자료(`e2e/fixtures/test-pose.*`)를 산출물 `/eval/`에 넣고, `/?mode=eval`로 연 탭에서만 녹화 입력·테스트 도구를 켠다. 자료가 없으면 빌드가 실패한다. 주최 측 허용 여부는 미확인이다(PRD 7절). | `docker-compose.yml` 빌드 인자(기본 true)이다. 배포 사이트 빌드에는 넣지 않는다. |
 
 비밀값은 저장소·브라우저 번들·로그에 넣지 않는다. `.env.example`은 변수 이름만 제공한다.
 
@@ -78,3 +78,20 @@ npx playwright test --project=desktop --forbid-only
 ```
 
 테스트가 없으면 실패한다. 제출 자료 존재 검사도 파일 내용·영상 추론·실제 E2E 통과를 대신하지 않는다. 현재 준비 상태는 진행 기록을 따른다. 실제 제출에서는 CI가 하는 것처럼 RELEASE_ID에 빌드 대상 SHA를 주입한다.
+
+## 딥 모드 연결 서버
+
+`posture-web/server.js`가 앱과 같은 포트에서 `/relay` WebSocket을 받는다. QR 토큰·PC 승인·측면 입력 전달·유실·종료 확인을 처리하며 연결 상태는 메모리에만 둔다. 프로토콜은 PRD 6절, 시간값은 `posture-web/shared/deep-protocol.js`이다. 서버 테스트는 `npm test --prefix posture-web`에 포함된다.
+
+- 휴대폰 카메라는 HTTPS(보안 문맥)에서만 켜진다. 같은 Wi-Fi에서 시험할 때는 `npm run dev --prefix posture-web`의 HTTPS 주소(자체 서명 인증서)를 PC·휴대폰에서 연다.
+- 현재 Vercel 배포는 정적 파일만 제공해 `/relay`가 없다. 공개 HTTPS에서 딥 모드를 쓰려면 Docker 이미지를 WebSocket을 지원하는 실행 환경에 올려야 하며, 아직 정하지 않았다.
+
+## 배포 사이트
+
+Vercel 배포는 `posture-web`에서 빌드한다. 배포할 commit을 깨끗한 작업 트리로 꺼낸 뒤 그 commit의 전체 SHA를 `RELEASE_ID`로 넣는다. 작업 중인 파일이 남은 상태에서 다른 SHA를 붙여 배포하지 않는다.
+
+```sh
+git status --porcelain   # 비어 있어야 한다
+npx vercel deploy --prod --build-env RELEASE_ID=$(git rev-parse HEAD)
+curl https://<배포 주소>/__health   # releaseId가 같은 SHA인지 확인
+```

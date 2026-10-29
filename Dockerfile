@@ -4,6 +4,11 @@ WORKDIR /app
 COPY posture-web/package.json posture-web/package-lock.json ./
 RUN npm ci
 COPY posture-web/ ./
+# 평가 전용 빌드(docs/prd.md 7절): 녹화 입력 영상·구간 명세를 dist/eval에 넣고 테스트 도구를 켤 수 있게 한다.
+# 배포 사이트(Vercel) 빌드에는 넣지 않는다.
+ARG EVAL_ENABLED=false
+ENV EVAL_ENABLED=$EVAL_ENABLED
+COPY e2e/fixtures/test-pose.webm e2e/fixtures/test-pose.manifest.json /e2e/fixtures/
 RUN npm run build
 
 FROM node:24-alpine

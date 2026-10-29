@@ -26,7 +26,8 @@ const SEGMENTS = [
 const CHECKS = {
   good: (r) => r.valid / r.frames >= 0.9 && r.deviated / r.frames <= 0.05,
   turtle: (r) => r.valid / r.frames >= 0.9 && r.deviated / r.frames >= 0.9,
-  away: (r) => r.away / r.frames >= 0.9,
+  // 뒤쪽 다른 사람이 잡혀 인식 불가로 보이는 프레임이 섞인다. 자세를 판정한 프레임이 없어야 한다.
+  away: (r) => r.valid === 0 && r.away / r.frames >= 0.75,
   brief_touch: (r) => r.valid / r.frames >= 0.3, // 참고 구간: 가린 시간이 있어도 대부분 유효
 }
 
@@ -63,8 +64,8 @@ manifest.verification = {
   date: new Date().toISOString().slice(0, 10),
   method: `구간마다 ${stepSeconds}초 간격 프레임을 앱과 같은 모델·신호·판정 코드로 추론. 기준은 good 구간 평균`,
   model: 'pose_landmarker_lite/float16/1+face_landmarker/float16/1',
-  criteria: 'good: 유효≥90%·이탈≤5%, turtle: 유효≥90%·이탈≥90%, away: 자리 비움≥90%',
-  note: '앱 실행 중 판정은 400ms 처리·최근 3개 평균이라 프레임 단위 결과와 다를 수 있다. E2E 시각 오차는 별도 실측한다.',
+  criteria: 'good: 유효≥90%·이탈≤5%, turtle: 유효≥90%·이탈≥90%, away: 유효 0·자리 비움≥75%(나머지는 인식 불가)',
+  note: '재생하며 추론하므로 프레임 수는 추론 속도에 따라 다르다. 앱 실행 중 판정은 400ms 처리·최근 3개 평균이라 결과가 다를 수 있다. E2E 시각 오차는 별도 실측한다.',
 }
 write()
 console.log(JSON.stringify(manifest.segments.map(({ label, verified, inference }) => ({ label, verified, ...inference })), null, 2))

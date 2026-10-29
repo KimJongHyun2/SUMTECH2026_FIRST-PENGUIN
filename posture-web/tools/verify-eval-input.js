@@ -11,19 +11,19 @@ const out = document.getElementById('out');
 const canvas = document.createElement('canvas');
 const ctx = canvas.getContext('2d');
 
-// 멈춘 영상을 옮긴 뒤 그 프레임을 캔버스에 그려 추론한다(멈춘 video를 바로 넣으면 이전 프레임이 쓰일 수 있다).
-function seek(t) {
-  return new Promise((resolve) => {
-    video.onseeked = () => resolve();
-    video.currentTime = t;
-  });
-}
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// 앱과 같이 영상을 재생하면서 STEP_S마다 현재 프레임을 캔버스에 그려 추론한다.
+// (멈춘 영상을 시크해 읽으면 헤드리스 브라우저에서 이전 프레임이 반복될 수 있다)
 async function samplesOf(models, segment) {
   const [pose, face] = models;
   const samples = [];
-  for (let t = segment.start + STEP_S / 2; t < segment.end; t += STEP_S) {
-    await seek(t);
+  video.currentTime = segment.start;
+  await new Promise((resolve) => { video.onseeked = resolve; });
+  await video.play();
+  while (video.currentTime < segment.end - 0.1) {
+    await wait(STEP_S * 1000);
+    if (video.currentTime >= segment.end) break;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const now = performance.now();
     const landmarks = largestPose(pose.detectForVideo(canvas, now).landmarks);
@@ -32,12 +32,15 @@ async function samplesOf(models, segment) {
     const signals = landmarks ? frontSignals(landmarks, canvas.width, canvas.height) : null;
     samples.push(signals && { ...signals, pitch_deg: matrix ? pitchFromMatrix(matrix) : null });
   }
+  video.pause();
   return samples;
 }
 
 async function main() {
   const manifest = await fetch('/eval/test-pose.manifest.json', { cache: 'no-store' }).then((r) => r.json());
-  video.src = `/eval/${manifest.file}`;
+  // 앱(RecordedInput)과 같이 통째로 받아 Blob으로 재생한다. 서버가 Range 요청을 지원하지 않아도 시크할 수 있다.
+  const blob = await fetch(`/eval/${manifest.file}`).then((r) => r.blob());
+  video.src = URL.createObjectURL(blob);
   await new Promise((resolve) => { video.onloadeddata = resolve; });
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;

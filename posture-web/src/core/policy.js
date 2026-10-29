@@ -10,14 +10,8 @@ export const POLICY = Object.freeze({
   recognitionGraceSeconds: 2,
 });
 
-// QR 만료 120초는 확정값이다. 감시·장애·자체 중단 시간은 실기기로 확정한다(docs/prd.md 6절).
-// 구현을 위해 archive/planning-history의 과거 제안값을 임시로 쓰며, 확정 조건으로 표시하지 않는다.
-export const CONNECTION_PILOT = Object.freeze({
-  qrExpirySeconds: 120,
-  heartbeatSeconds: 2,
-  disconnectSeconds: 6,
-  phoneStopSeconds: 10,
-});
+// 딥 모드 연결 시간값은 서버와 함께 쓰므로 shared/deep-protocol.js에 둔다(QR 120초만 확정, 나머지는 파일럿).
+export { CONNECTION_PILOT } from '../../shared/deep-protocol.js';
 
 export const WARNING_TEXT = '기준 자세에서 벗어난 상태가 지속되고 있습니다. 자세를 확인해 주세요.';
 

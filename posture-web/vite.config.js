@@ -11,8 +11,12 @@ const EVAL_FILES = ['test-pose.webm', 'test-pose.manifest.json'];
 const FIXTURES = resolve(import.meta.dirname, '../e2e/fixtures');
 
 function evalInput() {
+  let outDir;
   return {
     name: 'eval-input',
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir);
+    },
     configureServer(server) {
       if (!EVAL_ENABLED) return;
       server.middlewares.use('/eval', (req, res, next) => {
@@ -24,12 +28,12 @@ function evalInput() {
     },
     closeBundle() {
       if (!EVAL_ENABLED) return;
-      const out = resolve(import.meta.dirname, 'dist/eval');
+      const out = resolve(outDir, 'eval');
       mkdirSync(out, { recursive: true });
-      for (const name of EVAL_FILES) {
-        // 없으면 앱이 '평가 입력을 불러올 수 없어요'로 막는다. 빌드는 실패시키지 않는다.
-        if (existsSync(resolve(FIXTURES, name))) copyFileSync(resolve(FIXTURES, name), resolve(out, name));
-      }
+      // 평가 빌드인데 자료가 없으면 빌드를 실패시킨다. 빈 경로를 성공처럼 배포하지 않는다.
+      const missing = EVAL_FILES.filter((name) => !existsSync(resolve(FIXTURES, name)));
+      if (missing.length) throw new Error(`EVAL_ENABLED=true 빌드에 평가 자료가 없어요: e2e/fixtures/${missing.join(', ')}`);
+      for (const name of EVAL_FILES) copyFileSync(resolve(FIXTURES, name), resolve(out, name));
     },
   };
 }
