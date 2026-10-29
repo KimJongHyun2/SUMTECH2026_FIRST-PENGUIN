@@ -1,0 +1,76 @@
+{
+  "file": "test-pose.webm",
+  "sha256": "481e099f54930dc87e48b36f8ddb44619460ce25fcab05298ea3c7b5e132b6ae",
+  "bytes": 4796002,
+  "width": 640,
+  "height": 480,
+  "fps": 30,
+  "codec": "vp8",
+  "durationSeconds": 54.5,
+  "source": "front-good·front-turtle·front-away 원본(e2e/tools/record.html, 640×480)을 이어 붙여 VP8로 다시 인코딩",
+  "segments": [
+    {
+      "label": "good",
+      "start": 0,
+      "end": 16,
+      "description": "바른 자세로 앉아 있기 (손으로 얼굴을 만지는 장면을 뺀 16초)",
+      "verified": true,
+      "inference": {
+        "frames": 25,
+        "valid": 25,
+        "away": 0,
+        "unrecognized": 0,
+        "deviated": 0
+      }
+    },
+    {
+      "label": "turtle",
+      "start": 16,
+      "end": 36,
+      "description": "몸은 그대로, 머리를 화면 쪽으로 내민 채 유지 (20초)",
+      "verified": true,
+      "inference": {
+        "frames": 23,
+        "valid": 23,
+        "away": 0,
+        "unrecognized": 0,
+        "deviated": 23
+      }
+    },
+    {
+      "label": "away",
+      "start": 36,
+      "end": 51,
+      "description": "자리를 비워 화면에 본인이 없음, 뒤쪽 다른 사람만 보임 (15초)",
+      "verified": true,
+      "inference": {
+        "frames": 18,
+        "valid": 0,
+        "away": 15,
+        "unrecognized": 3,
+        "deviated": 0
+      }
+    },
+    {
+      "label": "brief_touch",
+      "start": 51,
+      "end": 54.5,
+      "description": "바른 자세에서 손으로 안경·머리를 잠깐 만짐 (약 2초 가림 포함, 참고용)",
+      "verified": true,
+      "inference": {
+        "frames": 4,
+        "valid": 4,
+        "away": 0,
+        "unrecognized": 0,
+        "deviated": 1
+      }
+    }
+  ],
+  "verification": {
+    "date": "2026-10-29",
+    "method": "구간마다 0.2초 간격 프레임을 앱과 같은 모델·신호·판정 코드로 추론. 기준은 good 구간 평균",
+    "model": "pose_landmarker_lite/float16/1+face_landmarker/float16/1",
+    "criteria": "good: 유효≥90%·이탈≤5%, turtle: 유효≥90%·이탈≥90%, away: 유효 0·자리 비움≥75%(나머지는 인식 불가)",
+    "note": "재생하며 추론하므로 프레임 수는 추론 속도에 따라 다르다. 앱 실행 중 판정은 400ms 처리·최근 3개 평균이라 결과가 다를 수 있다. E2E 시각 오차는 별도 실측한다."
+  }
+}

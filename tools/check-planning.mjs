@@ -92,7 +92,7 @@ try {
     const required = scenarios.scenarios.map((item) => `e2e/scenarios/${item.id}.spec.ts`);
     // 현재 흐름이 채택한 녹화 입력 자료이다. 공식 키트의 고정 파일명이 아니다.
     if (scenarios.scenarios.some((item) => item.steps.some((step) => step.includes('/?mode=eval')))) {
-      required.push('e2e/fixtures/test-pose.mp4', 'e2e/fixtures/test-pose.manifest.json');
+      required.push('e2e/fixtures/test-pose.webm', 'e2e/fixtures/test-pose.manifest.json');
     }
     const missing = required.filter((file) => {
       const location = path.join(root, file);
