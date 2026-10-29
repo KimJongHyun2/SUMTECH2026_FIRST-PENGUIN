@@ -37,6 +37,7 @@ export class SessionEngine {
     this.warnings = [];
     this.holds = [];
     this.openHold = null;
+    this.stops = [];
     this.reports = [];
     this.windowStartAt = [];
     this.segments = [{ fromValid: 0, at: startedAt, mode, baselineId, settingsVersionId }];
@@ -154,10 +155,14 @@ export class SessionEngine {
     this.openHold = null;
   }
 
-  /** 진행이 아닌 상태로 바꿀 때: 보류 구간과 열린 이탈을 함께 닫는다. */
+  /**
+   * 진행을 끊는 사용자·시스템 동작: 보류 구간과 열린 이탈을 닫고, 이탈 유무와 별개로 세션 중단 기록을 남긴다.
+   * (일시 정지·설정/기준/모드 변경·연결 장애. 종료는 세션 상태로 남는다)
+   */
   #stop(reason, t) {
     this.#closeHold(t);
     this.#closeEpisode(reason, t);
+    if (reason !== 'ended') this.stops.push({ reason, at: t, validAt: this.validMs, mode: this.mode });
   }
 
   #closeEpisode(reason, t) {
