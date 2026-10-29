@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test"
-import { fact, numberIn } from "../helpers"
+import { fact, numberIn, ratioMatches } from "../helpers"
 
 const WARNING = "기준 자세에서 벗어난 상태가 지속되고 있습니다. 자세를 확인해 주세요."
 
@@ -58,5 +58,5 @@ test("S2 대학생이 10초 기준 이탈 경고를 받고 3초 복귀 후 종�
   expect(D).toBeGreaterThanOrEqual(13)
   expect(D).toBeLessThanOrEqual(16)
   expect(V).toBeGreaterThanOrEqual(D)
-  expect(Math.abs(ratio - (D / V) * 100)).toBeLessThanOrEqual(2)
+  expect(ratioMatches(D, V, ratio)).toBe(true)
 })

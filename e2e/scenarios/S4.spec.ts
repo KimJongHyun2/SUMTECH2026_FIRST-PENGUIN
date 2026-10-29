@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test"
-import { fact, numberIn } from "../helpers"
+import { fact, numberIn, ratioMatches } from "../helpers"
 
 test("S4 대학생이 자리 비움으로 시간 연속성이 끊긴 뒤 새 이탈 경고를 확인한다", async ({ page }) => {
   // 평가 전용 빌드: '카메라 켜기'가 e2e/fixtures/test-pose.webm의 녹화 구간을 공통 판정 경로로 공급한다.
@@ -71,5 +71,5 @@ test("S4 대학생이 자리 비움으로 시간 연속성이 끊긴 뒤 새 이
   expect(D).toBeGreaterThanOrEqual(13)
   expect(D).toBeLessThanOrEqual(16)
   expect(V).toBeGreaterThanOrEqual(D + 6)
-  expect(Math.abs(ratio - (D / V) * 100)).toBeLessThanOrEqual(2)
+  expect(ratioMatches(D, V, ratio)).toBe(true)
 })
