@@ -1,24 +1,44 @@
 # SUMTECH2026 FIRST-PENGUIN — 내 카드 찾기
 
-내 신분(대학생·군인·직장인 등)과 한 달 지출을 넣으면, 카드마다 **내가 실제로 받을 예상 혜택 금액**을 계산해 나에게 맞는 카드를 추천하는 웹 서비스예요.
+신분과 한 달 지출을 넣으면 카드마다 **내가 실제로 받을 혜택 금액**을 계산해 맞는 카드를 추천하고, 지금 쓰는 카드와 비교해 **바꾸면 1년에 얼마 더 받는지**까지 보여 주는 웹 서비스예요.
 
-- 문제정의·기능 명세: [docs/problem.yaml](docs/problem.yaml)
-- 핵심 사용자 흐름: [docs/scenarios.yaml](docs/scenarios.yaml)
-- 진행 기록: [progress.md](progress.md)
+## 문서
 
-## 구현 설계 (요약)
+| 문서 | 내용 |
+|---|---|
+| [docs/problem.yaml](docs/problem.yaml) | **기준.** 문제정의와 기능 명세 F1~F8 (대시보드가 읽음) |
+| [docs/scenarios.yaml](docs/scenarios.yaml) | **기준.** 사용자 핵심 흐름 S1~S8 = E2E 대본 (대시보드가 읽음) |
+| [docs/intent.md](docs/intent.md) | 왜 이렇게 만들었나 — 의도·차별점·안 만드는 것 |
+| [docs/spec.md](docs/spec.md) | 화면·타입·계산식·문구·API 구현 명세 |
+| [docs/plan.md](docs/plan.md) | 구현 순서·검증 방법·진행 상태 |
+| [progress.md](progress.md) | 대회 진행 기록 |
 
-- 로그인 없음. 입력한 내 정보는 서버에 저장하지 않아요.
-- 카드 정보는 실행 중에 크롤링하지 않고, 대회 기간에 카드사 공개 상품 페이지에서 모은 `data/cards.json`을 앱 시작 시 DB에 시드해요. 카드마다 출처 URL과 정보 확인일을 함께 저장해요.
-- 추천 순위는 규칙으로 계산해요: 자격·종류·연회비로 거르기 → 전월실적 확인 → 예상 월 혜택 = Σ min(분야 지출 × 할인율, 월 한도) → 연간 순혜택 = 월 혜택 × 12 − 연회비 순 정렬.
-- 지금 쓰는 카드를 고르면 같은 규칙으로 계산해 "1위 카드로 바꾸면 연 ○○원 더"를 보여 줘요(F8).
-- AI(AI Gateway)는 "문장으로 쓴 소비 → 분야별 금액" 변환에만 써요.
+## 기술 구성
 
-## 설치·실행
+Next.js 15 (App Router) · React 19 · TypeScript (strict) · CSS Modules. 카드 데이터는 `data/cards.json`(읽기 전용, DB 없음), 입력값은 브라우저 sessionStorage에만 저장해요.
 
-(서비스 구현 후 작성 예정. `docker compose up --build`로 실행하는 방법과 환경변수 표를 여기에 적어요.)
+```
+app/          화면(/, /find, /result, /compare, /cards, /cards/[id]) · api/parse-spending · __health
+components/   화면 조각 + .module.css
+lib/          types · constants · recommend(계산, 순수 함수) · parse-spending(AI) · cards · format
+data/         cards.json
+```
+
+## 실행
+
+```bash
+npm install
+```
+
+```bash
+npm run dev
+```
+
+http://localhost:3000 에서 열려요. 그 밖의 명령: `npm run typecheck`, `npm run build`, `npm start`.
+docker 실행 방법은 docker 구성을 마친 뒤 여기에 적어요.
 
 | 환경변수 | 용도 | 설정 위치 |
 |---|---|---|
-| AI_GATEWAY_API_KEY | 문장으로 지출 입력(F3)의 AI 호출 | 로컬 `.env`, 배포 환경변수, GitHub Secrets |
+| AI_GATEWAY_API_KEY | 문장으로 지출 입력(F3)의 AI 호출. 없으면 규칙 기반 추출로 대신함 | 로컬 `.env`, 배포 환경변수, GitHub Secrets |
+| AI_MODEL | AI Gateway 모델 이름(선택, 기본 `openai/gpt-4o-mini`) | 로컬 `.env`, 배포 환경변수 |
 | RELEASE_ID | `/__health`가 응답하는 배포 commit | 배포·CI |
