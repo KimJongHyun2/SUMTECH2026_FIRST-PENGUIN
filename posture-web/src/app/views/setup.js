@@ -38,10 +38,13 @@ export async function turnOnCamera() {
   }
 }
 
-/** 연속 안정 5초 기준 등록을 시작한다. 인식이 끊기거나 흔들리면 처음부터 다시 센다. */
-export function beginRegistration(messageEl, onSaved) {
+/**
+ * 연속 안정 5초 기준 등록을 시작한다. 인식이 끊기거나 흔들리면 처음부터 다시 센다.
+ * 딥 모드는 정면·측면을 함께 모으는 collector와 측면 기준을 담는 toRecord를 넘긴다.
+ */
+export function beginRegistration(messageEl, onSaved, { collector = new BaselineCollector(), toRecord = baselineRecord } = {}) {
   app.registration = {
-    collector: new BaselineCollector(),
+    collector,
     onProgress(result) {
       if (result.status === 'collecting') {
         const done = Math.min(POLICY.baselineStableSeconds, Math.floor(result.progress * POLICY.baselineStableSeconds));
@@ -52,8 +55,8 @@ export function beginRegistration(messageEl, onSaved) {
         messageEl.textContent = '얼굴·어깨가 안정적으로 보일 때부터 5초를 다시 셀게요';
       }
     },
-    async onDone(features, now) {
-      const record = baselineRecord(features, now);
+    async onDone(features, now, result) {
+      const record = toRecord(features, now, result);
       try {
         if (!app.store) throw new Error(app.storageError);
         await app.store.addBaseline(record);

@@ -1,11 +1,19 @@
 // /watch 감지 화면: 진행·경고·복귀(F2), 일시 정지·재개·종료(F3), 판정 보류(F4), 설정(F5), 기준 재등록(F1)
+import { evaluateDeep } from '../../core/deep.js';
 import { evaluateFrame } from '../../core/detector.js';
 import { RECOGNITION_LABELS, SESSION_STATE_LABELS, SessionEngine } from '../../core/engine.js';
 import { DEFAULT_SETTINGS, SENSITIVITY, WARNING_TEXT, sameSettings, validateSettings, withDefaults } from '../../core/policy.js';
-import { app, camera, navigate, newId, onLive, onView, placeCamera, recorded, saveSession } from '../ctx.js';
+import { app, camera, link, navigate, newId, onLive, onView, placeCamera, recorded, saveSession } from '../ctx.js';
 import { $, clock, dateTime, show } from '../format.js';
 import { beep } from '../sound.js';
 import { beginRegistration, turnOnCamera } from './setup.js';
+
+// 휴대폰 촬영 종료 요청·확인 표시 (확인 응답이 없으면 완료로 쓰지 않는다)
+const PHONE_STOP_LABELS = {
+  requested: '종료 요청 중…',
+  confirmed: '종료 요청·확인됨',
+  unconfirmed: '종료 요청·확인 안 됨',
+};
 
 const SAVE_EVERY_MS = 5000;
 const PLACEMENT_OK_MS = 1000;
@@ -34,11 +42,13 @@ export async function startSession(now, mode = 'basic') {
     settings: version.settings,
   });
   app.session = engine;
+  app.phoneUsed = false;
   reportReady = false;
   saveStatus = null;
   app.replay = null;
   // 평가 모드: 녹화 입력과 미리 누른 리포트 가속을 테스트 기록으로 남긴다 (docs/prd.md 7절).
   if (recorded) engine.markTest('녹화 정면 입력');
+  if (mode === 'deep' && app.simPhone) engine.markTest('측면 모의 입력(테스트 휴대폰)');
   if (app.reportAccelPending) {
     engine.accelerateFirstReport(now, app.reportAccelPending);
     app.reportAccelPending = null;
@@ -95,8 +105,21 @@ export function sessionTick(now) {
     return;
   }
   if (session.state !== 'running') return;
+  // 딥 모드에서 연결 유실이 확인되면 판정을 멈추고 복구 대기로 바꾼다. 기본 모드 전환은 사용자가 고른다 (F10).
+  if (session.mode === 'deep' && !link.linked) {
+    handle(session.enterRecovery(now));
+    $('watch-msg').textContent = "휴대폰 연결이 끊겼어요. 판정을 멈췄어요. 정면 카메라로 계속하려면 '기본 모드로 계속'을 눌러 주세요";
+    saveSession(now);
+    return;
+  }
   const input = app.frame.quality === 'valid' ? app.frame.smoothed : app.frame.sample;
-  app.lastEval = evaluateFrame(input, app.baseline?.features, withDefaults(session.settings).sensitivity);
+  const { sensitivity } = withDefaults(session.settings);
+  app.lastEval = evaluateFrame(input, app.baseline?.features, sensitivity);
+  if (session.mode === 'deep') {
+    // 측면 입력이 무효·중단·오래됨이면 정면만으로 판정하지 않고 전체를 보류한다.
+    const side = link.idle ? null : link.side;
+    app.lastEval = evaluateDeep(app.lastEval, side, app.baseline.side, link.serverNow(), sensitivity);
+  }
   handle(session.tick(now, app.lastEval));
   if (now - app.lastSave >= SAVE_EVERY_MS) saveSession(now);
 }
@@ -227,10 +250,23 @@ $('watch-report').onclick = openReport;
 $('end-report').onclick = openReport;
 $('end-history').onclick = () => navigate('/history');
 
+// 복구 대기에서 사용자가 고르면 같은 세션의 새 기본 구간을 시작한다. 새 이탈은 새 10초를 요구한다 (F10).
+$('watch-basic').onclick = () => {
+  const now = Date.now();
+  if (app.session.state !== 'recovering' || app.frame.quality !== 'valid') return;
+  handle(app.session.setMode(now, 'basic'));
+  handle(app.session.start(now));
+  $('watch-msg').textContent = '정면 카메라만으로 같은 세션을 기본 모드로 이어서 감지해요';
+  saveSession(now);
+};
+
 $('watch-end').onclick = async () => {
   const now = Date.now();
   app.registration = null;
   app.resuming = false;
+  // 딥 모드를 썼으면 휴대폰에 촬영 종료를 요청한다. 연결이 이미 끊겼으면 '확인 안 됨'으로 남는다.
+  app.phoneUsed = app.session.segments.some((segment) => segment.mode === 'deep');
+  if (app.phoneUsed) link.requestStop();
   handle(app.session.end(now));
   camera.stop();
   show($('settings-panel'), false);
@@ -288,13 +324,23 @@ function renderWatch() {
   show($('watch-pause'), session.state === 'running');
   show($('watch-resume'), session.state === 'paused');
   $('watch-rebaseline').disabled = session.state !== 'running' && session.state !== 'paused';
+  // 복구 대기에서만 보이고, 유효한 정면 기준·입력이 있을 때만 누를 수 있다.
+  show($('watch-basic'), session.state === 'recovering');
+  $('watch-basic').disabled = app.frame.quality !== 'valid';
 
   show($('end-panel'), ended);
   if (ended) {
     $('end-camera').textContent = camera.on ? '켜짐' : '꺼짐';
-    $('end-phone').textContent = '-';
+    $('end-phone').textContent = phoneStopText();
     $('end-save').textContent = saveStatus ?? '-';
   }
+}
+
+function phoneStopText() {
+  if (!app.phoneUsed) return '-';
+  const text = PHONE_STOP_LABELS[link.stop.status] ?? '-';
+  // 테스트 휴대폰의 응답은 실제 촬영 종료 확인이 아니다.
+  return link.stop.status === 'confirmed' && app.simPhone ? `${text} (테스트 휴대폰 모의 응답)` : text;
 }
 
 onView('/watch', () => {

@@ -103,5 +103,8 @@ a { color: inherit; }
 
 .session-list { list-style: none; padding: 0; margin: 0 0 12px; display: grid; gap: 8px; }
 .session-item { width: 100%; text-align: left; border-radius: 12px; }
+.qr-box { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; margin: 12px 0; }
+.qr-box canvas { background: #fff; border-radius: 8px; }
+.phone-video { width: 100%; max-width: 360px; border-radius: 12px; background: #000; }
 .test-tools { border: 2px dashed var(--muted); border-radius: 12px; padding: 12px; margin-top: 16px; }
 .confirm { border: 2px solid var(--error); border-radius: 12px; padding: 16px; margin: 12px 0; }

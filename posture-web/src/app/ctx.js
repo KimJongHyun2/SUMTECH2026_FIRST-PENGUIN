@@ -1,6 +1,7 @@
 // 화면들이 함께 쓰는 상태·라우터·카메라·저장. 화면 전환 중에도 카메라와 세션이 끊기지 않도록 한 페이지 안에서 주소만 바꾼다.
 import { APP_ROUTES } from '../../shared/routes.js';
 import { FrontCamera } from './camera.js';
+import { PcLink } from './deeplink.js';
 import { RecordedInput, evalActive } from './eval.js';
 import { $ } from './format.js';
 
@@ -28,6 +29,8 @@ export const app = {
 
 export const recorded = EVAL ? new RecordedInput() : null;
 export const camera = new FrontCamera($('video'), $('preview'), recorded);
+// 딥 모드 휴대폰 연결 (연결 화면에서 열고, 감지 화면에서 측면 입력을 읽는다)
+export const link = new PcLink();
 
 const renderers = {};
 const liveRenderers = [];
@@ -63,6 +66,7 @@ export function placeCamera() {
   const box = $('cam-box');
   let slot = null;
   if (camera.on && app.view === '/setup') slot = $('setup-cam');
+  if (camera.on && app.view === '/connect') slot = $('connect-cam');
   if (camera.on && app.view === '/watch' && (!$('rebaseline-panel').hidden || app.resuming)) slot = $('watch-cam');
   if (slot) slot.append(box);
   box.hidden = !slot;

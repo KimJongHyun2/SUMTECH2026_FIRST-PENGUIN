@@ -3,7 +3,9 @@ import { averageSamples, frameQuality } from '../core/detector.js';
 import { openStore } from '../core/store.js';
 import { app, camera, navigate, onView, renderLive, route } from './ctx.js';
 import { $, show } from './format.js';
+import './views/connect.js';
 import './views/history.js';
+import './views/phone.js';
 import './views/report.js';
 import './views/setup.js';
 import { initTools } from './views/tools.js';
@@ -53,7 +55,7 @@ function registrationTick(now, sample) {
   reg.onProgress(result);
   if (result.status === 'done') {
     app.registration = null;
-    reg.onDone(result.baseline, now);
+    reg.onDone(result.baseline, now, result);
   }
 }
 
@@ -76,6 +78,11 @@ document.addEventListener('click', (event) => {
 window.addEventListener('popstate', () => route(location.pathname));
 
 async function init() {
+  // 휴대폰 측면 카메라 화면은 기록 저장소를 열지 않는다(휴대폰에 기록을 남기지 않는다).
+  if (location.pathname === '/phone') {
+    route(location.pathname);
+    return;
+  }
   try {
     app.store = await openStore();
     // 새로고침 등으로 끝나지 않은 세션은 마지막 저장 구간까지만 중단 세션으로 남긴다 (F3).

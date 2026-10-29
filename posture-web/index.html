@@ -197,14 +197,50 @@
       </div>
     </section>
 
-    <!-- /connect, /phone 딥 모드 (별도 커밋에서 구현) -->
+    <!-- /connect 딥 모드 PC 연결 (F8·F9) -->
     <section data-view="/connect" class="card" hidden>
-      <h2>딥 모드</h2>
-      <p class="muted">휴대폰을 측면 카메라로 연결하는 딥 모드는 준비 중이에요.</p>
+      <h2>딥 모드 연결</h2>
+      <p class="muted">휴대폰으로 QR을 찍어 연결을 요청하면, 이 PC에서 승인한 뒤에만 연결돼요. 휴대폰은 옆모습의 각도와 인식 품질만 보내고 기록을 저장하지 않아요.</p>
+      <div class="actions">
+        <button class="btn primary" id="connect-approve" hidden>연결 승인</button>
+        <button class="btn" id="connect-reject" hidden>거절</button>
+        <button class="btn" id="connect-qr-new">새 QR 만들기</button>
+        <button class="btn" id="connect-camera-on">카메라 켜기</button>
+        <button class="btn primary" id="connect-register" disabled>기준 자세 등록</button>
+        <button class="btn primary" id="connect-start" disabled>딥 모드 탐지 시작</button>
+      </div>
+      <p class="status-line" id="connect-msg" aria-live="polite"></p>
+      <p class="error" id="connect-error" role="alert" hidden></p>
+      <div class="qr-box" id="connect-qr-box">
+        <canvas id="connect-qr" width="180" height="180" aria-label="휴대폰 연결 QR"></canvas>
+        <p class="muted small" id="connect-qr-link"></p>
+      </div>
+      <div class="cam-slot" id="connect-cam"></div>
+      <dl class="facts" aria-label="연결 상태">
+        <div><dt>연결</dt><dd id="connect-state">대기</dd></div>
+        <div><dt>QR</dt><dd id="connect-qr-state">-</dd></div>
+        <div><dt>측면 입력</dt><dd id="connect-side">-</dd></div>
+        <div><dt>PC 카메라</dt><dd id="connect-camera">꺼짐</dd></div>
+        <div><dt>딥 기준</dt><dd id="connect-baseline">없음</dd></div>
+      </dl>
+      <div id="connect-tools"></div>
     </section>
+
+    <!-- /phone 휴대폰 측면 카메라 (QR로 연다) -->
     <section data-view="/phone" class="card" hidden>
-      <h2>휴대폰 연결</h2>
-      <p class="muted">딥 모드는 준비 중이에요.</p>
+      <h2>휴대폰 측면 카메라</h2>
+      <p class="muted">PC에서 승인하면 옆모습의 귀–어깨 각도와 인식 품질만 PC로 보내요. 영상과 기록은 이 휴대폰에 저장하거나 보내지 않아요.</p>
+      <div class="actions">
+        <button class="btn primary" id="phone-request">연결 요청</button>
+        <button class="btn primary" id="phone-camera" disabled>카메라 켜기</button>
+      </div>
+      <p class="status-line" id="phone-msg" aria-live="polite"></p>
+      <video id="phone-video" class="phone-video" playsinline muted></video>
+      <dl class="facts" aria-label="휴대폰 상태">
+        <div><dt>연결</dt><dd id="phone-state">요청 전</dd></div>
+        <div><dt>촬영</dt><dd id="phone-camera-state">꺼짐</dd></div>
+        <div><dt>측면 각도</dt><dd id="phone-angle">-</dd></div>
+      </dl>
     </section>
   </main>
 
@@ -222,6 +258,9 @@
         <button class="btn" id="tt-accel">[테스트용] 리포트 3초 가속</button>
         <button class="btn" id="tt-front">[테스트용] 정면 이탈·복귀 재생</button>
         <button class="btn" id="tt-away">[테스트용] 자리 비움·재이탈 재생</button>
+        <button class="btn" id="tt-side">[테스트용] 측면 데이터 주입</button>
+        <button class="btn" id="tt-both">[테스트용] 양쪽 이탈·복귀 재생</button>
+        <button class="btn" id="tt-disconnect">[테스트용] 측면 연결 끊기</button>
       </div>
       <p class="status-line" id="test-tools-status" aria-live="polite"></p>
     </div>
