@@ -72,7 +72,7 @@ $('history-compare').onclick = () => {
   const index = sessions.findIndex((s) => s.id === selected.id);
   const result = compareSessions(selected, sessions[index + 1] ?? null);
   $('history-compare-result').textContent = result.comparable
-    ? `이전 기록 이탈 비율 ${percent(result.previous.ratio)} → 이번 ${percent(result.current.ratio)} (같은 모드·기준·설정)`
+    ? `이전 기록 이탈 비율 ${percent(result.previous.ratio)} → 이번 ${percent(result.current.ratio)} (같은 모드·지표·기준·설정·배치)`
     : result.message;
 };
 

@@ -115,6 +115,14 @@ export const REPLAYS = {
       { clip: 'good', label: '복귀 3초', done: (s) => !s.warningActive },
     ],
   },
+  // 딥 모드: 정면 녹화 구간과 측면 모의 각도를 함께 바꾼다(측면은 MockPhone.lean).
+  deep: {
+    name: '양쪽 이탈·복귀 재생',
+    steps: [
+      { clip: 'turtle', label: '양쪽 이탈 10초', done: (s) => s.warningActive },
+      { clip: 'good', label: '양쪽 복귀 3초', done: (s) => !s.warningActive },
+    ],
+  },
   away: {
     name: '자리 비움·재이탈 재생',
     steps: [

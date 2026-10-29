@@ -1,12 +1,15 @@
 import '../app.css';
 import { averageSamples, frameQuality } from '../core/detector.js';
 import { openStore } from '../core/store.js';
-import { app, camera, navigate, onView, renderLive, route } from './ctx.js';
+import { app, camera, navigate, onView, renderLive, route, sideInput } from './ctx.js';
 import { $, show } from './format.js';
+import './views/connect.js';
 import './views/history.js';
+import './views/phone.js';
 import './views/report.js';
 import './views/setup.js';
 import { initTools } from './views/tools.js';
+import { primeSound } from './sound.js';
 import { sessionTick } from './views/watch.js';
 
 const TICK_MS = 400;
@@ -42,6 +45,9 @@ function tick() {
   } else {
     app.frame = { quality: 'away', faceFound: false, sample: null, smoothed: null };
   }
+  // 딥 모드 연결 heartbeat도 워커 tick으로 보낸다(백그라운드 탭의 타이머 지연 대비).
+  app.link?.heartbeat(now);
+  app.mockPhone?.link.heartbeat(now);
   if (app.session) sessionTick(now);
   app.replay?.tick(now, app.session);
   renderLive(now);
@@ -49,7 +55,13 @@ function tick() {
 
 function registrationTick(now, sample) {
   const reg = app.registration;
-  const result = reg.collector.push(now, sample);
+  let result;
+  if (reg.deep) {
+    const side = sideInput(now);
+    result = reg.collector.push(now, sample, side.quality, side.side);
+  } else {
+    result = reg.collector.push(now, sample);
+  }
   reg.onProgress(result);
   if (result.status === 'done') {
     app.registration = null;
@@ -76,6 +88,11 @@ document.addEventListener('click', (event) => {
 window.addEventListener('popstate', () => route(location.pathname));
 
 async function init() {
+  // 휴대폰 측면 카메라 화면은 기록을 남기지 않으므로 저장소를 열지 않는다 (docs/prd.md 4절).
+  if (location.pathname === '/phone') {
+    route(location.pathname);
+    return;
+  }
   try {
     app.store = await openStore();
     // 새로고침 등으로 끝나지 않은 세션은 마지막 저장 구간까지만 중단 세션으로 남긴다 (F3).
@@ -86,6 +103,9 @@ async function init() {
     console.error(error);
     app.storageError = '기록을 저장할 수 없는 브라우저 상태예요. 기록·기준이 저장되지 않을 수 있어요.';
   }
+  // 다른 화면을 보는 동안의 첫 경고음이 무음이 되지 않게, 사용자가 화면을 누를 때 소리 장치를 미리 깨운다.
+  document.addEventListener('pointerdown', primeSound);
+  document.addEventListener('keydown', primeSound);
   initTools();
   startTicker();
   route(location.pathname);

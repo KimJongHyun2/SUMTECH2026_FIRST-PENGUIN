@@ -1,4 +1,5 @@
 // /setup 카메라 설정 화면: 카메라 켜기, 기준 자세 등록(F1), 권한 실패(F4), 탐지 시작(F3)
+import { DeepBaselineCollector } from '../../core/deep.js';
 import { BaselineCollector, MODEL_VERSION } from '../../core/detector.js';
 import { POLICY } from '../../core/policy.js';
 import { cameraErrorMessage } from '../camera.js';
@@ -8,7 +9,16 @@ import { startSession } from './watch.js';
 
 let saved = { sessions: 0, reports: 0, valid: 0, deviation: 0 };
 
-export function baselineRecord(features, now) {
+// 다시 셀 때의 안내. 딥 모드는 어느 쪽 입력 때문에 다시 세는지 알려 준다.
+const RESTART_TEXT = {
+  front: '얼굴·어깨가 안정적으로 보일 때부터 5초를 다시 셀게요',
+  side_stale: '측면 입력이 끊겨 5초를 다시 셀게요. 휴대폰 연결과 촬영을 확인해 주세요',
+  side_unrecognized: '휴대폰이 귀·어깨를 찾지 못해 5초를 다시 셀게요. 옆모습이 보이게 휴대폰을 놓아 주세요',
+  side_unstable: '옆모습이 흔들려 5초를 다시 셀게요. 편하게 앉아 움직이지 말아 주세요',
+};
+
+/** deep이면 정면 특징에 측면 각도(side_angle_deg)를 더한 양쪽 기준이다. 정면 특징은 기본 모드 전환에도 쓴다. */
+export function baselineRecord(features, now, deep = false) {
   return {
     id: newId('b'),
     createdAt: now,
@@ -20,10 +30,12 @@ export function baselineRecord(features, now) {
       shoulder_w: features.shoulder_w,
       center_x: features.center_x,
       center_y: features.center_y,
+      ...(deep ? { side_angle_deg: features.side_angle_deg } : {}),
     },
     camera: { label: camera.label, ...camera.size },
+    ...(deep ? { sideCamera: { source: 'phone', linkId: app.link?.linkId ?? null } } : {}),
     modelVersion: MODEL_VERSION,
-    kind: 'front',
+    kind: deep ? 'deep' : 'front',
   };
 }
 
@@ -38,10 +50,14 @@ export async function turnOnCamera() {
   }
 }
 
-/** 연속 안정 5초 기준 등록을 시작한다. 인식이 끊기거나 흔들리면 처음부터 다시 센다. */
-export function beginRegistration(messageEl, onSaved) {
+/**
+ * 연속 안정 5초 기준 등록을 시작한다. 인식이 끊기거나 흔들리면 처음부터 다시 센다.
+ * deep이면 정면·측면이 함께 안정돼야 한다(F9). 측면 입력은 main.js의 등록 tick이 함께 넣는다.
+ */
+export function beginRegistration(messageEl, onSaved, { deep = false } = {}) {
   app.registration = {
-    collector: new BaselineCollector(),
+    deep,
+    collector: deep ? new DeepBaselineCollector() : new BaselineCollector(),
     onProgress(result) {
       if (result.status === 'collecting') {
         const done = Math.min(POLICY.baselineStableSeconds, Math.floor(result.progress * POLICY.baselineStableSeconds));
@@ -49,16 +65,16 @@ export function beginRegistration(messageEl, onSaved) {
       } else if (result.status === 'paused') {
         messageEl.textContent = '잠깐 가려졌어요. 다시 보이면 이어서 셀게요';
       } else if (result.status === 'restarted') {
-        messageEl.textContent = '얼굴·어깨가 안정적으로 보일 때부터 5초를 다시 셀게요';
+        messageEl.textContent = RESTART_TEXT[result.reason] ?? RESTART_TEXT.front;
       }
     },
     async onDone(features, now) {
-      const record = baselineRecord(features, now);
+      const record = baselineRecord(features, now, deep);
       try {
         if (!app.store) throw new Error(app.storageError);
         await app.store.addBaseline(record);
         app.baseline = record;
-        messageEl.textContent = '기준 자세가 등록됐어요';
+        messageEl.textContent = deep ? '정면·측면 양쪽 기준이 등록됐어요' : '기준 자세가 등록됐어요';
         onSaved?.(record, now);
       } catch (error) {
         console.error(error);
