@@ -3,29 +3,29 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>패스트거북이</title>
-  <meta name="description" content="노트북 웹캠으로 지속적인 자세 변화를 감지하고 알려줘 자기 조정과 거북목 예방을 돕는 서비스" />
+  <title>바른목</title>
+  <meta name="description" content="노트북 웹캠으로 거북목을 알려주고, 언제 자세가 무너지는지 정리해 주는 웹 서비스" />
 </head>
 <body>
   <header class="top">
-    <span class="logo">🐢 패스트거북이</span>
+    <span class="logo">🐢 바른목</span>
   </header>
 
   <main>
     <section id="intro" class="card hero">
-      <h1>공부에 집중하는 동안<br />자세 변화를 알려드릴게요</h1>
-      <p>거북목 예방을 위한 자세 관리, 스스로 확인할 수 있게 도와드려요. 노트북 웹캠으로 등록한 기준 대비 변화를 감지하고, 머리가 앞으로 나온 상태가 30초 이어지면 알려드려요. 기록으로 반복되는 패턴도 돌아보세요.</p>
+      <h1>공부하다 거북목이 되면<br />살짝 알려드릴게요</h1>
+      <p>노트북 웹캠으로 자세를 보고, 거북목이 30초 이어지면 알림을 보내요. 오늘 언제, 얼마나 무너졌는지도 정리해 드려요.</p>
       <ul class="points">
         <li>설치 없이 브라우저에서 바로</li>
         <li>영상은 이 기기 밖으로 나가지 않아요</li>
-        <li>개인 기준 자세를 등록하고 시작</li>
+        <li>처음 한 번 바른 자세 기준만 잡으면 끝</li>
       </ul>
       <button id="start" class="btn primary">시작하기</button>
       <p id="start-msg" class="muted" aria-live="polite"></p>
     </section>
 
     <section id="setup" class="card" hidden>
-      <h2>개인 기준 자세 등록</h2>
+      <h2>바른 자세 기준 잡기</h2>
       <p class="muted">평소처럼 화면을 보며 허리를 펴고 앉아 주세요. 버튼을 누르면 5초 동안 기준을 잡아요.</p>
       <div id="cam-slot-setup" class="cam-slot"></div>
       <ul class="checks">
@@ -40,7 +40,7 @@
       <div id="status-card" class="card status" data-state="good">
         <div class="turtle" aria-hidden="true">🐢</div>
         <div>
-          <p id="state-text" class="state">기준 범위 안에 있어요</p>
+          <p id="state-text" class="state">좋은 자세예요</p>
           <p id="state-sub" class="muted"></p>
         </div>
       </div>
@@ -59,18 +59,18 @@
       <h2>오늘의 자세</h2>
       <div class="stats">
         <div><strong id="r-minutes">-</strong><small>측정 시간</small></div>
-        <div><strong id="r-good">-</strong><small>기준 범위 내 비율</small></div>
-        <div><strong id="r-turtle">-</strong><small>머리 전방 이탈 시간</small></div>
-        <div><strong id="r-first">-</strong><small>앉은 뒤 첫 전방 이탈까지</small></div>
+        <div><strong id="r-good">-</strong><small>바른 자세</small></div>
+        <div><strong id="r-turtle">-</strong><small>거북목</small></div>
+        <div><strong id="r-first">-</strong><small>앉은 뒤 처음 무너지기까지</small></div>
       </div>
-      <h3>시간대별 기준 범위 내 비율</h3>
+      <h3>시간대별 바른 자세 비율</h3>
       <div id="hourly" class="hourly"></div>
       <p id="insight" class="insight"></p>
     </section>
   </main>
 
   <footer class="muted small">
-    개인 기준 대비 자세 변화를 알려주는 예방 목적의 습관 도우미예요. 기준 자세는 의학적 정상 판정이 아니며 진단·치료를 제공하지 않아요. 기록은 이 브라우저에만 저장돼요.
+    의학적 진단이 아닌 자세 습관 도우미예요. 기록은 이 브라우저에만 저장돼요.
   </footer>
 
   <div id="cam-box" class="cam-box" hidden>
