@@ -9,7 +9,7 @@
  *   holds: 판정 보류 구간 [{ reason: 'away'|'unrecognized', startAt, validAt }] (확정 이탈 유무와 별개)
  * @param start 구간 시작(포함), end 구간 끝(제외). includeEnd면 끝 시점의 보류도 포함(종료 리포트)
  */
-export function windowMetrics({ events, warnings, candidate, validNow, holds = [] }, start, end, { includeEnd = false } = {}) {
+export function windowMetrics({ events, warnings, candidate, validNow, holds = [], segments = [] }, start, end, { includeEnd = false } = {}) {
   const validEnd = Math.min(end, validNow);
   const validMs = Math.max(0, validEnd - start);
   let deviationMs = 0;
@@ -51,7 +51,33 @@ export function windowMetrics({ events, warnings, candidate, validNow, holds = [
     provisional: Boolean(candidate && candidate.onsetValid < end && candidate.onsetValid >= start),
     holds: windowHolds,
     events: items,
+    modes: modeMetrics(events, segments, start, validEnd, validNow),
   };
+}
+
+/**
+ * 모드별 V·D·비율 (docs/prd.md 6절 5). 세션 구간(segments)의 모드로 유효 시간을, 이벤트의 모드로 이탈 시간을 나눈다.
+ * 모드 간 비율 차이를 개선 효과로 쓰지 않는다.
+ */
+function modeMetrics(events, segments, start, validEnd, validNow) {
+  const out = {};
+  const add = (mode, key, ms) => {
+    if (ms <= 0) return;
+    out[mode] ??= { validMs: 0, deviationMs: 0 };
+    out[mode][key] += ms;
+  };
+  segments.forEach((seg, i) => {
+    const segEnd = segments[i + 1]?.fromValid ?? validNow;
+    add(seg.mode, 'validMs', Math.min(segEnd, validEnd) - Math.max(seg.fromValid, start));
+  });
+  for (const e of events) {
+    add(e.mode ?? 'basic', 'deviationMs', Math.min(e.endValid ?? validNow, validEnd) - Math.max(e.onsetValid, start));
+  }
+  return Object.fromEntries(Object.entries(out).map(([mode, { validMs, deviationMs }]) => [mode, {
+    validSeconds: validMs / 1000,
+    deviationSeconds: deviationMs / 1000,
+    ratio: validMs > 0 ? deviationMs / validMs : null,
+  }]));
 }
 
 export const HOLD_REASON_LABELS = {
