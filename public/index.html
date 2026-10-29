@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>내 카드 찾기</title>
+<style>
+  :root { --bg:#f6f5f2; --card:#fff; --ink:#1d1d1f; --muted:#6b6b70; --brand:#2f5bea; --ok:#1a8f4c; --warn:#c2410c; --line:#e5e3de; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif; }
+  main { max-width:480px; margin:0 auto; padding:16px 16px 96px; }
+  h1 { font-size:22px; margin:8px 0; } h2 { font-size:18px; margin:16px 0 8px; }
+  .box { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; margin:10px 0; }
+  button { font:inherit; border:0; border-radius:10px; padding:10px 14px; background:var(--brand); color:#fff; cursor:pointer; }
+  button.sub { background:#eceaf5; color:var(--ink); } button:disabled { opacity:.5; cursor:default; }
+  input, select { font:inherit; padding:9px; border:1px solid var(--line); border-radius:8px; width:100%; background:#fff; }
+  label { display:block; font-size:13px; color:var(--muted); margin:8px 0 4px; }
+  .row { display:flex; gap:8px; align-items:center; } .row > * { flex:1; }
+  .muted { color:var(--muted); font-size:13px; } .err { color:var(--warn); font-weight:600; margin:8px 0; }
+  .tag { display:inline-block; font-size:12px; padding:2px 8px; border-radius:99px; background:#e7f6ee; color:var(--ok); margin:2px 4px 2px 0; }
+  .tag.off { background:#fdecea; color:var(--warn); }
+  .todo { background:#fff7d6; border:1px dashed #d4a800; border-radius:10px; padding:8px 10px; font-size:13px; margin:8px 0; }
+  .bar { height:8px; background:#eee; border-radius:99px; overflow:hidden; margin:6px 0; } .bar > i { display:block; height:100%; background:var(--brand); }
+  .big { font-size:20px; font-weight:700; } .win { border:2px solid var(--brand); }
+  nav { position:fixed; bottom:0; left:0; right:0; display:flex; background:#fff; border-top:1px solid var(--line); }
+  nav a { flex:1; text-align:center; padding:14px; color:var(--muted); text-decoration:none; } nav a.on { color:var(--brand); font-weight:700; }
+  table { width:100%; border-collapse:collapse; font-size:14px; } td, th { padding:6px 4px; border-bottom:1px solid var(--line); text-align:left; }
+  a { color:var(--brand); }
+</style>
+</head>
+<body>
+<main id="app"></main>
+
+<script src="/app.js"></script>
+</body>
+</html>
