@@ -1,12 +1,13 @@
 import { FaceLandmarker, FilesetResolver, PoseLandmarker } from '@mediapipe/tasks-vision';
 
-// package.json의 @mediapipe/tasks-vision 버전과 맞춰야 한다.
-const WASM_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.0/wasm';
+// 실행 중 외부 사이트에 기대지 않도록 wasm(scripts/copy-mediapipe-wasm.mjs)과 모델(public/models)을 우리 서버에서 제공한다.
+const WASM_URL = '/mediapipe/wasm';
 const POSE_MODELS = {
-  lite: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',
+  lite: '/models/pose_landmarker_lite.task',
+  // 실험 도구(?model=full) 전용. 서비스는 lite만 쓴다.
   full: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task',
 };
-const FACE_MODEL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
+const FACE_MODEL = '/models/face_landmarker.task';
 
 let filesetPromise;
 const fileset = () => (filesetPromise ??= FilesetResolver.forVisionTasks(WASM_URL));

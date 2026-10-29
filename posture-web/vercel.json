@@ -1,3 +1,9 @@
 {
-  "rewrites": [{ "source": "/__health", "destination": "/health.json" }]
+  "rewrites": [
+    { "source": "/__health", "destination": "/health.json" },
+    { "source": "/(setup|watch|connect|report|history|phone)", "destination": "/index.html" }
+  ],
+  "headers": [
+    { "source": "/__health", "headers": [{ "key": "Cache-Control", "value": "no-store" }] }
+  ]
 }

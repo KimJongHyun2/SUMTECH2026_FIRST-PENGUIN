@@ -1,0 +1,13 @@
+.git
+**/node_modules
+**/dist
+**/.vercel
+**/.vitest
+**/__pycache__
+**/.pytest_cache
+posture-web/data
+posture-web/results
+posture-web/public/mediapipe
+e2e
+tools
+docs
