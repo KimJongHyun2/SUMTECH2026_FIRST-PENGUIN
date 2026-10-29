@@ -13,10 +13,15 @@ const TICK_MS = 400;
 const SMOOTH_FRAMES = 3;
 
 // 탭이 뒤로 가도 측정이 덜 느려지도록 타이머를 워커에서 돌린다.
+// 측정 한 번이 주기보다 오래 걸리면 그 사이 요청이 쌓인다. 쌓인 오래된 요청은 건너뛰어
+// 측정이 줄줄이 이어지며 화면 조작(클릭)이 막히지 않게 한다.
 function startTicker() {
-  const src = `setInterval(() => postMessage(0), ${TICK_MS});`;
+  const src = `setInterval(() => postMessage(Date.now()), ${TICK_MS});`;
   const worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
-  worker.onmessage = tick;
+  worker.onmessage = (event) => {
+    if (Date.now() - event.data > TICK_MS) return;
+    tick();
+  };
 }
 
 function tick() {
