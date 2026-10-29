@@ -28,9 +28,10 @@ function countBy(items, key) {
 
 function reportTitle(report) {
   const range = `유효 ${clock(report.startValid)}–${clock(report.endValid)}`;
-  if (report.kind === 'auto') return `자동 리포트 ${report.index + 1} (${range})`;
-  if (report.kind === 'final') return `종료 리포트 (${range})`;
-  return '종료 리포트';
+  const mode = report.mode === 'deep' ? ' · 딥 모드' : '';
+  if (report.kind === 'auto') return `자동 리포트 ${report.index + 1}${mode} (${range})`;
+  if (report.kind === 'final') return `종료 리포트${mode} (${range})`;
+  return `종료 리포트${mode}`;
 }
 
 function reportCard(report) {

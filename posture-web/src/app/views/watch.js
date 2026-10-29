@@ -369,6 +369,9 @@ function renderWatch(now = Date.now()) {
   $('watch-phone').textContent = phoneText(session, now);
   $('watch-delivery').textContent = withDefaults(session.settings).sound ? DELIVERY_TEXT.soundOn : DELIVERY_TEXT.soundOff;
   $('watch-baseline').textContent = session.currentSegment.baselineId;
+  const applied = withDefaults(session.settings);
+  $('watch-settings-version').textContent =
+    `${session.currentSegment.settingsVersionId} · 경고 ${applied.warningSeconds}초 · 재경고 ${applied.rewarningSeconds}초`;
   $('watch-recognition').textContent = session.state === 'running' ? RECOGNITION_LABELS[session.recognition] : '-';
   $('watch-posture').textContent = postureText(session);
   $('watch-valid').textContent = clock(session.validMs);
