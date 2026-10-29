@@ -77,7 +77,8 @@ a { color: inherit; }
 .facts dt { font-size: 0.8rem; color: var(--muted); }
 .facts dd { margin: 0; font-weight: 700; word-break: break-all; }
 
-.status-line { min-height: 1.5em; color: var(--muted); }
+/* 문구 길이가 바뀌어도 아래 내용이 들썩이지 않도록 두 줄 높이를 확보한다 */
+.status-line { min-height: 3.1em; color: var(--muted); }
 .warning { padding: 14px 16px; border-radius: 12px; background: var(--warn-bg); color: var(--warn); font-weight: 700; border: 2px solid var(--warn); }
 .notice { padding: 10px 14px; border-radius: 12px; background: var(--notice-bg); font-weight: 600; }
 .error { color: var(--error); font-weight: 600; }

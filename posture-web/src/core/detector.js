@@ -57,34 +57,44 @@ export function evaluateFrame(sample, baseline) {
 }
 
 /**
- * 안정된 유효 입력이 연속 5초 이어지면 기준을 만든다.
- * 인식이 끊기거나 크게 움직이면 처음부터 다시 모은다(F1).
+ * 안정된 유효 입력이 연속 5초 이어지면 기준을 만든다(F1).
+ * 유예 시간 이하의 짧은 가림은 시간을 멈췄다가 이어서 세고, 그보다 길게 끊기거나 크게 움직이면 처음부터 다시 모은다.
  */
 export class BaselineCollector {
-  constructor({ seconds = POLICY.baselineStableSeconds } = {}) {
+  constructor({ seconds = POLICY.baselineStableSeconds, graceSeconds = POLICY.recognitionGraceSeconds ?? 0 } = {}) {
     this.needMs = seconds * 1000;
-    this.reset();
-  }
-
-  reset() {
-    this.samples = [];
-    this.startT = null;
+    this.graceMs = graceSeconds * 1000;
     this.restarts = 0;
+    this.#clear();
   }
 
-  /** @returns {{ status: 'collecting'|'restarted'|'done', progress: number, baseline?: object }} */
+  #clear() {
+    this.samples = [];
+    this.stableMs = 0;
+    this.lastT = null;
+    this.invalidSince = null;
+  }
+
+  #restart() {
+    if (this.samples.length) this.restarts += 1;
+    this.#clear();
+    return { status: 'restarted', progress: 0 };
+  }
+
+  /** @returns {{ status: 'collecting'|'paused'|'restarted'|'done', progress: number, baseline?: object }} */
   push(t, sample) {
-    if (frameQuality(sample) !== 'valid' || this.#unstable(sample)) {
-      const hadData = this.samples.length > 0;
-      this.samples = [];
-      this.startT = null;
-      if (hadData) this.restarts += 1;
-      return { status: 'restarted', progress: 0 };
+    if (frameQuality(sample) !== 'valid') {
+      this.invalidSince ??= t;
+      if (!this.samples.length || t - this.invalidSince > this.graceMs) return this.#restart();
+      return { status: 'paused', progress: this.stableMs / this.needMs };
     }
-    if (this.startT === null) this.startT = t;
+    if (this.#unstable(sample)) return this.#restart();
+    // 끊겼던 사이의 시간은 안정 시간에 넣지 않는다.
+    if (this.lastT !== null && this.invalidSince === null) this.stableMs += t - this.lastT;
+    this.invalidSince = null;
+    this.lastT = t;
     this.samples.push(sample);
-    const elapsed = t - this.startT;
-    if (elapsed < this.needMs) return { status: 'collecting', progress: elapsed / this.needMs };
+    if (this.stableMs < this.needMs) return { status: 'collecting', progress: this.stableMs / this.needMs };
     return { status: 'done', progress: 1, baseline: averageSamples(this.samples) };
   }
 

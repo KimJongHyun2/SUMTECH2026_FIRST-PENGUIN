@@ -5,6 +5,9 @@ export const POLICY = Object.freeze({
   recoverySeconds: 3,
   rewarningSeconds: 60,
   reportValidSeconds: 1800,
+  // 안경 고쳐 쓰기·머리 넘기기처럼 짧은 가림은 연속 타이머를 초기화하지 않는다(이 시간 이하 인식 끊김).
+  // 기획 변경을 가정한 파일럿 값이다. 팀이 planning-policy.yaml·F1·F2·F4를 고치기 전까지 미확정.
+  recognitionGraceSeconds: 2,
 });
 
 // QR 만료 120초는 확정값이다. 감시·장애·자체 중단 시간은 실기기로 확정한다(docs/prd.md 6절).

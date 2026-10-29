@@ -37,6 +37,7 @@ export class SessionEngine {
     this.warnings = [];
     this.holds = [];
     this.openHold = null;
+    this.invalidSince = null;
     this.stops = [];
     this.reports = [];
     this.windowStartAt = [];
@@ -53,6 +54,7 @@ export class SessionEngine {
   get warningMs() { return this.settings.warningSeconds * 1000; }
   get rewarningMs() { return this.settings.rewarningSeconds * 1000; }
   get recoveryMs() { return this.policy.recoverySeconds * 1000; }
+  get graceMs() { return (this.policy.recognitionGraceSeconds ?? 0) * 1000; }
   get warningActive() { return this.episode?.status === 'confirmed'; }
   get candidateMs() { return this.episode?.status === 'candidate' ? this.episode.candidateMs : 0; }
   get currentSegment() { return this.segments.at(-1); }
@@ -69,14 +71,19 @@ export class SessionEngine {
     if (this.state !== 'running') return this.#drain();
     this.recognition = quality;
     if (quality !== 'valid') {
-      // 판정 보류: 후보는 버리고 확정 이탈은 그 사유로 닫는다. 확정 이탈 유무와 별개로 보류 구간을 남긴다.
+      // 짧은 가림(유예 시간 이하)은 판정·유효 시간만 멈추고 연속 타이머는 그대로 둔다.
+      this.invalidSince ??= t;
+      if (t - this.invalidSince <= this.graceMs) return this.#drain();
+      // 그보다 길면 판정 보류: 후보는 버리고 확정 이탈은 그 사유로 닫는다. 확정 이탈 유무와 별개로 보류 구간을 남긴다.
       if (this.openHold?.reason !== quality) {
+        const startAt = this.openHold ? t : this.invalidSince;
         this.#closeHold(t);
-        this.openHold = { reason: quality, startAt: t, endAt: null, validAt: this.validMs };
+        this.openHold = { reason: quality, startAt, endAt: null, validAt: this.validMs };
       }
       this.#closeEpisode(quality, t);
       return this.#drain();
     }
+    this.invalidSince = null;
     this.#closeHold(t);
 
     const prev = this.validMs;
@@ -160,6 +167,7 @@ export class SessionEngine {
    * (일시 정지·설정/기준/모드 변경·연결 장애. 종료는 세션 상태로 남는다)
    */
   #stop(reason, t) {
+    this.invalidSince = null;
     this.#closeHold(t);
     this.#closeEpisode(reason, t);
     if (reason !== 'ended') this.stops.push({ reason, at: t, validAt: this.validMs, mode: this.mode });
@@ -188,6 +196,7 @@ export class SessionEngine {
     if (this.state !== 'ended') {
       this.state = 'running';
       this.lastT = t;
+      this.invalidSince = null;
     }
     return this.#drain();
   }

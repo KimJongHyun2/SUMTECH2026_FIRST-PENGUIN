@@ -95,6 +95,40 @@ describe('경고·복귀 (F2)', () => {
     expect(m.holds.map((h) => h.reason)).toEqual(['away']);
   });
 
+  it('짧은 가림(2초 이하)은 후보를 버리지 않고 이어서 센다 — 가린 시간은 유효 시간에 넣지 않는다', () => {
+    const engine = newEngine();
+    let r = feed(engine, 0, 8, BAD);
+    r = feed(engine, r.t, 1.5, AWAY);
+    expect(engine.candidateMs).toBe(8000);
+    expect(engine.validMs).toBe(8000);
+    r = feed(engine, r.t, 2, BAD);
+    expect(types(r.signals)).toEqual(['warning']);
+    expect(engine.events).toHaveLength(1);
+    expect(engine.holds).toHaveLength(0);
+  });
+
+  it('짧은 가림은 확정 이탈도 닫지 않는다 (경고 중 안경 고쳐 쓰기)', () => {
+    const engine = newEngine();
+    let r = feed(engine, 0, 12, BAD);
+    r = feed(engine, r.t, 2, AWAY);
+    expect(types(r.signals)).toEqual([]);
+    expect(engine.warningActive).toBe(true);
+    r = feed(engine, r.t, 3, GOOD);
+    expect(types(r.signals)).toEqual(['clear']);
+    expect(engine.events[0].endReason).toBe('normal_return');
+  });
+
+  it('2초보다 길게 끊기면 후보를 버리고 보류 구간을 끊긴 시작 시각부터 남긴다', () => {
+    const engine = newEngine();
+    let r = feed(engine, 0, 8, BAD);
+    const awayStart = r.t + STEP;
+    r = feed(engine, r.t, 3, AWAY);
+    expect(engine.candidateMs).toBe(0);
+    expect(engine.openHold).toMatchObject({ reason: 'away', startAt: awayStart });
+    r = feed(engine, r.t, 3, BAD);
+    expect(types(r.signals)).toEqual([]);
+  });
+
   it('잠깐(3초 미만) 바르게 앉았다 다시 이탈하면 같은 이벤트가 이어진다', () => {
     const engine = newEngine();
     let r = feed(engine, 0, 12, BAD);
