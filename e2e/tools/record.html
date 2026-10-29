@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>E2E 입력 영상 녹화</title>
+  <style>
+    :root { --brand: #2f7d5b; --line: #dfe5e1; --muted: #5d6a66; --warn: #b5470f; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, "Malgun Gothic", sans-serif; background: #f6f7f4; color: #1c2321; line-height: 1.55; }
+    main { max-width: 920px; margin: 0 auto; padding: 24px 16px 48px; }
+    h1 { font-size: 1.5rem; margin: 0 0 4px; }
+    .muted { color: var(--muted); }
+    .card { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 18px; margin: 14px 0; }
+    .row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+    video { background: #000; border-radius: 10px; width: 320px; height: 240px; }
+    #preview { transform: scaleX(-1); } /* 보기 편하게 거울처럼만 보여준다. 녹화는 원본 그대로 */
+    button { font: inherit; font-weight: 600; padding: 9px 16px; border-radius: 999px; border: 1px solid var(--line); background: #fff; cursor: pointer; }
+    button.primary { background: var(--brand); color: #fff; border-color: var(--brand); }
+    button:disabled { opacity: .45; cursor: default; }
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.72); color: #fff; display: grid; place-items: center; text-align: center; padding: 24px; }
+    .overlay strong { font-size: 4rem; display: block; }
+    .overlay p { font-size: 1.4rem; max-width: 640px; }
+    .clip h2 { font-size: 1.1rem; margin: 0 0 4px; }
+    .result { font-size: .9rem; }
+    .error { color: var(--warn); font-weight: 600; }
+    ol { padding-left: 1.2em; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>E2E 입력 영상 녹화</h1>
+  <p class="muted">채점용 흐름 테스트(E2E)에서 카메라 대신 넣을 영상을 찍어요. 웹캠 원본을 640×480 webm으로 저장하며 서버로 보내지 않아요.</p>
+
+  <div class="card">
+    <strong>찍기 전에</strong>
+    <ol>
+      <li>평소 노트북 웹캠 위치 그대로, <b>얼굴과 양쪽 어깨가 모두</b> 보이게 앉아요.</li>
+      <li>세 영상을 <b>한자리에서 연달아</b> 찍어요. 노트북 위치·각도·의자·조명을 바꾸지 않아요.</li>
+      <li>뒤에 다른 사람·거울·사람 사진·모니터 속 얼굴이 보이지 않게 해요.</li>
+      <li>저장한 파일은 저장소의 <code>e2e/fixtures/</code>에 넣어요. 팀 저장소에 커밋되니 본인 동의가 필요해요.</li>
+    </ol>
+    <div class="row">
+      <video id="preview" autoplay muted playsinline></video>
+      <div>
+        <button class="primary" id="camera">카메라 켜기</button>
+        <p class="muted" id="camera-info"></p>
+        <p class="error" id="camera-error" hidden></p>
+      </div>
+    </div>
+  </div>
+
+  <div id="clips"></div>
+</main>
+
+<div class="overlay" id="overlay" hidden>
+  <div><strong id="overlay-count"></strong><p id="overlay-text"></p></div>
+</div>
+
+<script>
+  const CLIPS = [
+    { file: 'front-good.webm', title: '① 바른 자세', seconds: 30,
+      guide: '허리를 펴고 화면을 보며 최대한 가만히 앉아 있어요.' },
+    { file: 'front-turtle.webm', title: '② 이탈 자세 (머리 내밀기)', seconds: 20,
+      guide: '몸은 그대로 두고 머리를 화면 쪽으로 확실히(5~10cm) 내민 채 유지해요.' },
+    { file: 'front-away.webm', title: '③ 자리 비움', seconds: 15,
+      guide: '일어나서 화면 밖으로 완전히 나가 있어요. 카운트다운이 끝나기 전에 나가 주세요.' },
+  ];
+  const COUNTDOWN = 5;
+  const MIME = ['video/webm;codecs=vp8', 'video/webm;codecs=vp9', 'video/webm'].find((t) => MediaRecorder.isTypeSupported(t));
+  const MAX_BYTES = 10 * 1024 * 1024;
+  const $ = (id) => document.getElementById(id);
+  let stream = null;
+  let busy = false;
+
+  $('camera').onclick = async () => {
+    $('camera-error').hidden = true;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }, audio: false,
+      });
+      $('preview').srcObject = stream;
+      const s = stream.getVideoTracks()[0].getSettings();
+      $('camera-info').textContent = `${s.width}×${s.height} · ${Math.round(s.frameRate ?? 0)}fps · 형식 ${MIME}`;
+      $('camera').disabled = true;
+      document.querySelectorAll('[data-record]').forEach((b) => { b.disabled = false; });
+    } catch (e) {
+      $('camera-error').textContent = `카메라를 켜지 못했어요: ${e.name}. 주소가 http://localhost 인지, 권한을 허용했는지 확인해 주세요.`;
+      $('camera-error').hidden = false;
+    }
+  };
+
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  async function countdown(text, seconds, label) {
+    $('overlay').hidden = false;
+    $('overlay-text').textContent = text;
+    for (let i = seconds; i > 0; i -= 1) {
+      $('overlay-count').textContent = `${label} ${i}`;
+      await sleep(1000);
+    }
+  }
+
+  async function record(clip, card) {
+    if (busy || !stream) return;
+    busy = true;
+    document.querySelectorAll('[data-record]').forEach((b) => { b.disabled = true; });
+    await countdown(`준비: ${clip.guide}`, COUNTDOWN, '시작까지');
+
+    const chunks = [];
+    const recorder = new MediaRecorder(stream, { mimeType: MIME, videoBitsPerSecond: 1_000_000 });
+    recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+    const stopped = new Promise((r) => { recorder.onstop = r; });
+    recorder.start(1000);
+    await countdown(`녹화 중: ${clip.guide}`, clip.seconds, '남은 시간');
+    recorder.stop();
+    await stopped;
+    $('overlay').hidden = true;
+
+    const blob = new Blob(chunks, { type: 'video/webm' });
+    const url = URL.createObjectURL(blob);
+    const result = card.querySelector('.result');
+    const sizeMb = (blob.size / 1024 / 1024).toFixed(1);
+    result.replaceChildren();
+    const video = document.createElement('video');
+    video.src = url;
+    video.controls = true;
+    const info = document.createElement('p');
+    info.textContent = `${clip.seconds}초 · ${sizeMb}MB${blob.size > MAX_BYTES ? ' — 10MB를 넘어요. 다시 찍어 주세요.' : ''}`;
+    if (blob.size > MAX_BYTES) info.className = 'error';
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = clip.file;
+    link.textContent = `${clip.file} 저장`;
+    result.append(video, info, link);
+
+    busy = false;
+    document.querySelectorAll('[data-record]').forEach((b) => { b.disabled = false; });
+    card.querySelector('[data-record]').textContent = '다시 찍기';
+  }
+
+  for (const clip of CLIPS) {
+    const card = document.createElement('div');
+    card.className = 'card clip';
+    card.innerHTML = '<h2></h2><p class="muted"></p><button class="primary" data-record disabled>녹화 시작</button><div class="result"></div>';
+    card.querySelector('h2').textContent = `${clip.title} · ${clip.seconds}초 · ${clip.file}`;
+    card.querySelector('p').textContent = clip.guide;
+    card.querySelector('[data-record]').onclick = () => record(clip, card);
+    $('clips').append(card);
+  }
+</script>
+</body>
+</html>

@@ -6,4 +6,17 @@
 - 저작권·개인정보 문제가 없는 자료만 둔다. 촬영 당사자의 동의를 받은 영상만 쓴다.
 - 파일 하나는 10MB 이하로 둔다.
 
+## 정면 카메라 입력 영상
+
+`e2e/tools/record.html`로 찍는다(웹캠 원본, 640×480 webm). 저장소 루트에서
+`python -m http.server 8123 --bind 127.0.0.1 -d e2e/tools`를 실행하고 http://localhost:8123/record.html 을 연다.
+
+| 파일 | 내용 | 길이 |
+| --- | --- | --- |
+| `front-good.webm` | 바른 자세로 가만히 앉아 있기 | 30초 |
+| `front-turtle.webm` | 몸은 그대로, 머리를 화면 쪽으로 확실히 내민 채 유지 | 20초 |
+| `front-away.webm` | 화면 밖으로 완전히 나가 있기 | 15초 |
+
+세 영상은 같은 자리·조명·노트북 각도에서 연달아 찍는다.
+
 spec에서는 spec 파일 위치를 기준으로 경로를 만든다(`path.join(__dirname, "../fixtures/...")`). `__dirname`을 쓰므로 `e2e/package.json`에 `"type": "module"`을 넣지 않는다.
