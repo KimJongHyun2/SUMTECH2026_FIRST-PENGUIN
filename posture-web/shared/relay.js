@@ -73,7 +73,12 @@ export class ConnectionHub {
         this.#retire(entry, 'used', t);
         this.#send(entry.pc, { type: 'connect.canceled', requestId: entry.requestId, reason: `phone_${reason}` });
       }
-      if (client.link) this.#endLink(client.link, { pc: { type: 'link.lost', reason: `phone_${reason}` } });
+      if (client.link) {
+        const { stop } = client.link;
+        // 종료 확인을 기다리던 중 끊겨도 확인으로 보지 않는다. 연결이 끊긴 것은 카메라 종료의 증거가 아니다.
+        if (stop) this.#send(client.link.pc, { type: 'stop.unconfirmed', stopId: stop.id, reason: `phone_${reason}` });
+        this.#endLink(client.link, { pc: { type: 'link.lost', reason: `phone_${reason}` } });
+      }
     }
   }
 
@@ -130,7 +135,7 @@ export class ConnectionHub {
     for (const link of this.#links()) {
       if (link.stop && t - link.stop.at >= this.phoneStopMs) {
         this.#endLink(link, {
-          pc: { type: 'stop.unconfirmed', stopId: link.stop.id },
+          pc: { type: 'stop.unconfirmed', stopId: link.stop.id, reason: 'timeout' },
           phone: { type: 'link.revoked', reason: 'stop_timeout' },
         });
       } else if (!link.idle && t - link.lastSideAt > this.heartbeatMs) {

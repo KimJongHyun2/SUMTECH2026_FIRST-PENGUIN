@@ -44,3 +44,17 @@ jobs:
         working-directory: tools
       - run: node tools/check-problem.mjs
       - run: node tools/check-planning.mjs
+
+  # docs/scenarios.yaml의 흐름마다 e2e/scenarios/<id>.spec.ts·test 하나가 있는지, 금지된 우회가 없는지 본다.
+  # spec이 없는 흐름이 있으면 실패한다. 실제 통과 여부는 scenarios workflow가 확인한다.
+  scenario-specs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: npm ci
+        working-directory: tools
+      - run: node --test tools/check-scenario-specs.test.mjs
+      - run: node tools/check-scenario-specs.mjs
