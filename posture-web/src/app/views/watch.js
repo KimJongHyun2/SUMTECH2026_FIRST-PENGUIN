@@ -266,6 +266,9 @@ function renderWatch() {
   $('watch-state').textContent = SESSION_STATE_LABELS[session.state];
   $('watch-mode').textContent = MODE_LABELS[session.mode];
   $('watch-baseline').textContent = session.currentSegment.baselineId;
+  const applied = withDefaults(session.settings);
+  $('watch-settings-version').textContent =
+    `${session.currentSegment.settingsVersionId} · 경고 ${applied.warningSeconds}초 · 재경고 ${applied.rewarningSeconds}초`;
   $('watch-recognition').textContent = session.state === 'running' ? RECOGNITION_LABELS[session.recognition] : '-';
   $('watch-posture').textContent = postureText(session);
   $('watch-valid').textContent = clock(session.validMs);
