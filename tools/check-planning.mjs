@@ -47,7 +47,7 @@ try {
   }
 
   const prd = read('docs/prd.md');
-  // 이 표는 팀이 정한 운영 기본값이다. Starter Kit의 고정 시간 규칙으로 취급하지 않는다.
+  // 운영 기본값과 명시된 파일럿을 코드와 대조한다. 파일럿의 제품 승인을 뜻하지 않는다.
   const defaults = { ...POLICY, qrExpirySeconds: CONNECTION_PILOT.qrExpirySeconds };
   for (const [key, seconds] of Object.entries(defaults)) {
     assert(Number.isSafeInteger(seconds) && seconds > 0, `운영 기본값 ${key}`);
@@ -86,7 +86,7 @@ try {
     } else throw new Error(`알 수 없는 산술 종류: ${item.kind}`);
     assert.deepEqual(actual, item.expected, item.id);
   }
-  console.log(`문서 정적 검사 통과: ${scenarios.scenarios.length}개 흐름 규격, ${Object.keys(defaults).length}개 운영 기본값, ${problem.features.length}개 기능 참조, ${fixture.cases.length}개 가상 산술. 내용의 타당성·선택 경로 완주·앱/E2E는 별도 검증이다.`);
+  console.log(`문서 정적 검사 통과: ${scenarios.scenarios.length}개 흐름 규격, ${Object.keys(defaults).length}개 코드 정책값(파일럿 포함), ${problem.features.length}개 기능 참조, ${fixture.cases.length}개 가상 산술. 정책 승인·내용의 타당성·선택 경로 완주·앱/E2E는 별도 검증이다.`);
 
   if (process.argv.includes('--submission')) {
     const required = scenarios.scenarios.map((item) => `e2e/scenarios/${item.id}.spec.ts`);
