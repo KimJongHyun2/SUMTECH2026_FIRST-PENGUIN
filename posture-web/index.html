@@ -82,6 +82,7 @@
           <div><dt>세션 ID</dt><dd id="watch-session">-</dd></div>
           <div><dt>상태</dt><dd id="watch-state">-</dd></div>
           <div><dt>인식</dt><dd id="watch-recognition">-</dd></div>
+          <div><dt>자세 상태</dt><dd id="watch-posture">-</dd></div>
           <div><dt>모드</dt><dd id="watch-mode">기본</dd></div>
           <div><dt>기준</dt><dd id="watch-baseline">-</dd></div>
           <div><dt>유효 감지 시간</dt><dd id="watch-valid">00:00</dd></div>
@@ -91,7 +92,7 @@
 
       <div class="card" id="settings-panel" hidden>
         <h3>설정</h3>
-        <p class="muted small">기준 등록 5초·복귀 3초·자동 리포트 유효 30분은 바꿀 수 없어요. 적용하면 진행 중인 이탈은 설정 변경으로 닫고 새 구간으로 판정해요.</p>
+        <p class="muted small">기준 등록 5초·복귀 3초·자동 리포트 유효 30분은 바꿀 수 없어요. 값을 바꿔 적용하면 진행 중인 이탈은 설정 변경으로 닫고 새 구간으로 판정해요. 민감도 경계는 실측 전 시험값이에요.</p>
         <label class="field">경고 시간(초)
           <input id="settings-warning" inputmode="numeric" />
           <span class="error" id="settings-warning-error" role="alert"></span>
@@ -100,6 +101,14 @@
           <input id="settings-rewarning" inputmode="numeric" />
           <span class="error" id="settings-rewarning-error" role="alert"></span>
         </label>
+        <label class="field">민감도
+          <select id="settings-sensitivity">
+            <option value="low">낮음</option>
+            <option value="normal">보통</option>
+            <option value="high">높음</option>
+          </select>
+        </label>
+        <label class="field-inline"><input type="checkbox" id="settings-sound" /> 경고할 때 소리 내기</label>
         <p class="muted small" id="settings-version"></p>
         <div class="actions">
           <button class="btn primary" id="settings-apply">적용</button>
@@ -138,6 +147,7 @@
     <section data-view="/report" class="card" hidden>
       <h2>리포트</h2>
       <p class="muted" id="report-summary"></p>
+      <p class="muted small">이탈 비율은 연속 이탈이 경고 조건을 채운 구간(확정 이탈)의 시간을 유효 감지 시간으로 나눈 값이에요. 이탈이 시작된 때부터 복귀 확인 3초까지 포함하므로 기준 밖에 있던 모든 시간과 같지 않아요.</p>
       <div id="report-list"></div>
       <div id="report-session"></div>
       <div class="actions">

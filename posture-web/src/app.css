@@ -92,7 +92,7 @@ a { color: inherit; }
 .checks li.ok::before { content: "● "; color: var(--brand); }
 
 .field { display: grid; gap: 4px; margin: 8px 0; font-weight: 600; }
-.field input { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); max-width: 200px; }
+.field input, .field select { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); max-width: 200px; }
 .field .error { font-size: 0.85rem; min-height: 1.2em; }
 .field-inline { display: flex; gap: 8px; align-items: center; }
 

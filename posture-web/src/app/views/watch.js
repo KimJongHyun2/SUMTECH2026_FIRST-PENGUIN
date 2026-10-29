@@ -1,9 +1,10 @@
 // /watch 감지 화면: 진행·경고·복귀(F2), 일시 정지·재개·종료(F3), 판정 보류(F4), 설정(F5), 기준 재등록(F1)
 import { evaluateFrame } from '../../core/detector.js';
 import { RECOGNITION_LABELS, SESSION_STATE_LABELS, SessionEngine } from '../../core/engine.js';
-import { DEFAULT_SETTINGS, WARNING_TEXT, validateSettings } from '../../core/policy.js';
+import { DEFAULT_SETTINGS, SENSITIVITY, WARNING_TEXT, sameSettings, validateSettings, withDefaults } from '../../core/policy.js';
 import { app, camera, navigate, newId, onLive, onView, placeCamera, saveSession } from '../ctx.js';
 import { $, clock, dateTime, show } from '../format.js';
+import { beep } from '../sound.js';
 import { beginRegistration, turnOnCamera } from './setup.js';
 
 const SAVE_EVERY_MS = 5000;
@@ -62,6 +63,7 @@ function handle(signals) {
       // 재경고도 화면 낭독기가 다시 읽도록 문구를 다시 넣는다.
       $('watch-warning').textContent = '';
       $('watch-warning').textContent = WARNING_TEXT;
+      if (withDefaults(app.session.settings).sound) beep();
       saveSession();
     }
     if (signal.type === 'clear') saveSession();
@@ -87,7 +89,8 @@ export function sessionTick(now) {
   }
   if (session.state !== 'running') return;
   const input = app.frame.quality === 'valid' ? app.frame.smoothed : app.frame.sample;
-  handle(session.tick(now, evaluateFrame(input, app.baseline?.features)));
+  app.lastEval = evaluateFrame(input, app.baseline?.features, withDefaults(session.settings).sensitivity);
+  handle(session.tick(now, app.lastEval));
   if (now - app.lastSave >= SAVE_EVERY_MS) saveSession(now);
 }
 
@@ -117,10 +120,15 @@ $('watch-resume').onclick = async () => {
   placeCamera();
 };
 
+const currentSettings = () => withDefaults(app.settingsVersion?.settings ?? DEFAULT_SETTINGS);
+
 $('watch-settings').onclick = () => {
-  const { settings, id, appliedAt } = app.settingsVersion ?? { settings: DEFAULT_SETTINGS };
+  const { id, appliedAt } = app.settingsVersion ?? {};
+  const settings = currentSettings();
   $('settings-warning').value = String(settings.warningSeconds);
   $('settings-rewarning').value = String(settings.rewarningSeconds);
+  $('settings-sensitivity').value = settings.sensitivity;
+  $('settings-sound').checked = settings.sound;
   $('settings-warning-error').textContent = '';
   $('settings-rewarning-error').textContent = '';
   $('settings-version').textContent = id ? `현재 설정 버전 ${id} · 적용 ${dateTime(appliedAt)}` : '기본 설정';
@@ -130,11 +138,22 @@ $('watch-settings').onclick = () => {
 $('settings-close').onclick = () => show($('settings-panel'), false);
 
 $('settings-apply').onclick = async () => {
-  const result = validateSettings({ warningSeconds: $('settings-warning').value, rewarningSeconds: $('settings-rewarning').value });
+  const result = validateSettings({
+    warningSeconds: $('settings-warning').value,
+    rewarningSeconds: $('settings-rewarning').value,
+    sensitivity: $('settings-sensitivity').value,
+    sound: $('settings-sound').checked,
+  });
   $('settings-warning-error').textContent = result.errors?.warningSeconds ?? '';
   $('settings-rewarning-error').textContent = result.errors?.rewarningSeconds ?? '';
   // 잘못된 입력은 저장하지 않고 기존 설정·버전·측정 구간을 그대로 둔다.
   if (!result.ok) return;
+  // 같은 값 재적용은 오류 해제·화면 닫기만 한다. 새 버전·구간을 만들지 않는다.
+  if (sameSettings(result.settings, currentSettings())) {
+    show($('settings-panel'), false);
+    $('watch-msg').textContent = '바뀐 설정이 없어 기존 설정을 그대로 써요';
+    return;
+  }
 
   const now = Date.now();
   const version = { id: newId('c'), appliedAt: now, settings: result.settings };
@@ -148,7 +167,8 @@ $('settings-apply').onclick = async () => {
   app.settingsVersion = version;
   if (app.session && app.session.state !== 'ended') handle(app.session.applySettings(now, version.settings, version.id));
   show($('settings-panel'), false);
-  $('watch-msg').textContent = `설정을 적용했어요 (경고 ${version.settings.warningSeconds}초 · 재경고 ${version.settings.rewarningSeconds}초)`;
+  const { warningSeconds, rewarningSeconds, sensitivity, sound } = version.settings;
+  $('watch-msg').textContent = `설정을 적용했어요 (경고 ${warningSeconds}초 · 재경고 ${rewarningSeconds}초 · 민감도 ${SENSITIVITY[sensitivity].label} · 소리 ${sound ? '켬' : '끔'})`;
   saveSession(now);
 };
 
@@ -217,6 +237,14 @@ $('watch-end').onclick = async () => {
 
 // ------------------------------------------------------------ 표시
 
+/** 유형을 판별할 수 있을 때만 '머리가 기준보다 앞으로 나왔어요'를 쓰고, 입력이 무효이면 자세를 추정하지 않는다. */
+function postureText(session) {
+  if (session.state !== 'running' || !app.lastEval) return '-';
+  if (session.recognition !== 'valid') return '판정 보류';
+  if (!app.lastEval.deviated) return '기준 범위예요';
+  return app.lastEval.types.includes('head_forward') ? '머리가 기준보다 앞으로 나왔어요' : '기준에서 벗어났어요';
+}
+
 function renderWatch() {
   if (app.view !== '/watch') return;
   const session = app.session;
@@ -232,6 +260,7 @@ function renderWatch() {
   $('watch-mode').textContent = MODE_LABELS[session.mode];
   $('watch-baseline').textContent = session.currentSegment.baselineId;
   $('watch-recognition').textContent = session.state === 'running' ? RECOGNITION_LABELS[session.recognition] : '-';
+  $('watch-posture').textContent = postureText(session);
   $('watch-valid').textContent = clock(session.validMs);
   $('watch-candidate').textContent = session.candidateMs > 0 ? `${Math.floor(session.candidateMs / 1000)}초` : '-';
 
