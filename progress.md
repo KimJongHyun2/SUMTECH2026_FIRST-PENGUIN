@@ -6,10 +6,11 @@ Agent가 서비스 저장소 루트의 `progress.md`로 복사해 이어 쓴다(
 
 - 실제 서비스 저장소 폴더: C:\Users\jonghyun\github\SUMTECH2026_FIRST-PENGUIN (main)
 - 주제 변경(2026-10-29 17:45): "가입 사이트 기억 못함" → 나에게 맞는 카드 추천 서비스
-- 방향 전환(2026-10-29 저녁): 팀 캔버스 + 멘토(코드트리 대표) 피드백 "뱅크샐러드와 차이·와우포인트·추천에서 하나 더" → **카드 지갑 코치**(가진 카드 기준 결제 순간 추천 + 한 달 카드 플랜). 18:00 채점 AI 12.7/50(기획 12.7/30, 11위)
-- 현재 단계 / 다음 행동: problem.yaml·scenarios.yaml 재작성 → commit/push → 팀 측정(impact.measurable·E1) → data/cards.json(최소 20장)·example-wallet.json → 최소 화면·docker
-- 결정한 것: 로그인 없음, 지갑은 localStorage / platform mobile / 추천·플랜은 규칙 계산, AI는 가게 이름→분야 분류에만 / 실시간 크롤링·새 카드 추천·마이데이터 연동 안 함
-- 학생에게 확인할 내용: experiences(E1), impact.measurable(측정), 대안 "늘 쓰던 카드 한 장"·"뱅크샐러드" 단점이 실제와 맞는지(앱에서 확인), 시드할 카드 목록
+- 메인은 **새 카드 추천** 유지(학생 확인). d9197c2의 "카드 지갑 코치" 전환은 Agent가 임의로 바꾼 것이라 되돌림.
+- 멘토(코드트리 대표) 피드백 "뱅크샐러드와 차이·추천에서 하나 더" → F8 지금 카드와 비교("바꾸면 연 ○○원 더") 추가. 18:00 채점 AI 12.7/50(기획 12.7/30, 11위)
+- 현재 단계 / 다음 행동: PRD 복구+F8 push → 프로토타입 → 팀 측정(impact.measurable·E1) → data/cards.json(최소 20장) → docker
+- 결정한 것: 로그인 없음 / platform mobile(초안) / 추천은 규칙 계산, AI는 문장→지출 금액 변환에만 / 실시간 크롤링 안 함(시드 데이터)
+- 학생에게 확인할 내용: experiences(E1), impact.measurable, "뱅크샐러드" 단점이 실제와 맞는지(앱에서 확인), 시드할 카드 목록
 
 ## 1. GitHub 준비
 
