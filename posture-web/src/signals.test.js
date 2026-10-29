@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { POSE, angleFromPoints, frontSignals, pitchFromMatrix, sideAngle } from './signals.js';
+import { POSE, angleFromPoints, frontSignals, largestPose, pitchFromMatrix, sideAngle } from './signals.js';
 
 const W = 640;
 const H = 480;
@@ -21,6 +21,23 @@ const upright = {
 const zoom = (points, k) => Object.fromEntries(
   Object.entries(points).map(([i, p]) => [i, { x: 0.5 + (p.x - 0.5) * k, y: 0.5 + (p.y - 0.5) * k }]),
 );
+
+describe('배치 값과 가장 가까운 사람 고르기', () => {
+  it('어깨 너비·중심을 화면 대비 비율로 준다', () => {
+    const s = frontSignals(makePose(upright), W, H);
+    expect(s.shoulder_w).toBeCloseTo(0.3);
+    expect(s.center_x).toBeCloseTo(0.5);
+    expect(s.center_y).toBeCloseTo(0.7);
+  });
+
+  it('여러 사람이 잡히면 어깨가 가장 넓은 사람을 고른다', () => {
+    const far = makePose({ ...upright, [POSE.L_SHOULDER]: { x: 0.74, y: 0.8 }, [POSE.R_SHOULDER]: { x: 0.76, y: 0.8 } });
+    const near = makePose(upright);
+    expect(largestPose([far, near])).toBe(near);
+    expect(largestPose([])).toBeNull();
+    expect(largestPose(undefined)).toBeNull();
+  });
+});
 
 describe('frontSignals', () => {
   it('어깨 너비 기준 비율을 픽셀 단위로 계산한다', () => {

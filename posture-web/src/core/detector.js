@@ -1,26 +1,35 @@
 // 한 프레임의 입력 품질과 기준 대비 이탈을 판정한다.
-// 경계값은 p1 T1 데이터에서 잡은 파일럿 값이다(거북목_약 Δ목길이 −0.041, 고개숙임 Δpitch +31°).
-// 민감도 배율도 파일럿 값이며 실측으로 다시 정한다(docs/planning-policy.yaml threshold).
+// 경계값은 p1 T1 데이터에서 잡은 파일럿 값이며 실측으로 다시 정한다(docs/planning-policy.yaml threshold).
 import { POLICY } from './policy.js';
 
 export const MODEL_VERSION = 'pose_landmarker_lite/float16/1+face_landmarker/float16/1';
 
-const BASE_LIMITS = { headForward: 0.025, neckLen: 0.035, pitch: 20 };
-const SENSITIVITY_SCALE = { low: 1.5, normal: 1, high: 0.7 };
+export const LIMITS = Object.freeze({ headForward: 0.025, neckLen: 0.035, pitch: 20 });
 const MIN_VISIBILITY = 0.5;
 
+// 배치 확인. 노트북 앞에 앉은 사용자는 어깨가 화면 폭의 약 40%를 차지했고(p1 녹화),
+// 자리를 비웠을 때 뒤쪽에서 잡힌 다른 사람은 2% 이하였다. 경계는 실측 대상인 파일럿 값이다.
+export const PLACEMENT = Object.freeze({ minShoulderWidth: 0.12, sizeRatio: [0.6, 1.6], maxCenterShift: 0.2 });
+
 export const SIGNAL_KEYS = ['head_forward', 'neck_len', 'pitch_deg'];
+const PLACEMENT_KEYS = ['shoulder_w', 'center_x', 'center_y'];
 
-/** 'valid' | 'away'(사람이 안 보임) | 'unrecognized'(필수 지점 품질 부족) */
-export function frameQuality(sample) {
+/**
+ * 'valid' | 'away'(내 자리에 사람이 없음) | 'unrecognized'(필수 지점 품질 부족·기준과 다른 배치)
+ * placement를 주면 기준 등록 때와 같은 자리·크기인지도 확인한다.
+ */
+export function frameQuality(sample, placement = null) {
   if (!sample) return 'away';
+  if (typeof sample.shoulder_w === 'number' && sample.shoulder_w < PLACEMENT.minShoulderWidth) return 'away';
   if (!(sample.ear_vis >= MIN_VISIBILITY) || !(sample.shoulder_vis >= MIN_VISIBILITY)) return 'unrecognized';
+  if (placement?.shoulder_w && typeof sample.shoulder_w === 'number') {
+    const ratio = sample.shoulder_w / placement.shoulder_w;
+    const shift = Math.hypot(sample.center_x - placement.center_x, sample.center_y - placement.center_y);
+    if (ratio < PLACEMENT.sizeRatio[0] || ratio > PLACEMENT.sizeRatio[1] || shift > PLACEMENT.maxCenterShift) {
+      return 'unrecognized';
+    }
+  }
   return 'valid';
-}
-
-export function limitsFor(sensitivity = 'normal') {
-  const k = SENSITIVITY_SCALE[sensitivity] ?? 1;
-  return { headForward: BASE_LIMITS.headForward * k, neckLen: BASE_LIMITS.neckLen * k, pitch: BASE_LIMITS.pitch * k };
 }
 
 /** 여러 프레임 평균 (순간 흔들림 완화). pitch는 잡힌 프레임만 평균 낸다. */
@@ -28,7 +37,7 @@ export function averageSamples(samples) {
   const valid = samples.filter((s) => frameQuality(s) === 'valid');
   if (!valid.length) return null;
   const avg = { ear_vis: 1, shoulder_vis: 1 };
-  for (const key of SIGNAL_KEYS) {
+  for (const key of [...SIGNAL_KEYS, ...PLACEMENT_KEYS]) {
     const values = valid.map((s) => s[key]).filter((v) => typeof v === 'number');
     avg[key] = values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
   }
@@ -36,15 +45,14 @@ export function averageSamples(samples) {
 }
 
 /** 기준 대비 이탈 여부와 유형. 유형은 기록용이며 사용자에게는 공통 경고만 보인다. */
-export function evaluateFrame(sample, baseline, sensitivity = 'normal') {
-  const quality = frameQuality(sample);
+export function evaluateFrame(sample, baseline) {
+  const quality = frameQuality(sample, baseline);
   if (quality !== 'valid' || !baseline) return { quality, deviated: false, types: [] };
-  const limits = limitsFor(sensitivity);
   const types = [];
-  if (sample.head_forward - baseline.head_forward >= limits.headForward) types.push('head_forward');
-  if (sample.neck_len - baseline.neck_len <= -limits.neckLen) types.push('neck_len');
+  if (sample.head_forward - baseline.head_forward >= LIMITS.headForward) types.push('head_forward');
+  if (sample.neck_len - baseline.neck_len <= -LIMITS.neckLen) types.push('neck_len');
   if (typeof sample.pitch_deg === 'number' && typeof baseline.pitch_deg === 'number'
-    && sample.pitch_deg - baseline.pitch_deg >= limits.pitch) types.push('pitch');
+    && sample.pitch_deg - baseline.pitch_deg >= LIMITS.pitch) types.push('pitch');
   return { quality, deviated: types.length > 0, types };
 }
 
@@ -83,10 +91,9 @@ export class BaselineCollector {
   #unstable(sample) {
     if (!this.samples.length) return false;
     const mean = averageSamples(this.samples);
-    const limits = limitsFor('normal');
-    return Math.abs(sample.head_forward - mean.head_forward) >= limits.headForward
-      || Math.abs(sample.neck_len - mean.neck_len) >= limits.neckLen
+    return Math.abs(sample.head_forward - mean.head_forward) >= LIMITS.headForward
+      || Math.abs(sample.neck_len - mean.neck_len) >= LIMITS.neckLen
       || (typeof sample.pitch_deg === 'number' && typeof mean.pitch_deg === 'number'
-        && Math.abs(sample.pitch_deg - mean.pitch_deg) >= limits.pitch / 2);
+        && Math.abs(sample.pitch_deg - mean.pitch_deg) >= LIMITS.pitch / 2);
   }
 }

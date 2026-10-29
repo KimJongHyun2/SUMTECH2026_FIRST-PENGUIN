@@ -1,11 +1,15 @@
-// 공통 설계값 (docs/planning-policy.yaml). 파일럿 제안값이며 의학적 기준이나 검증된 최적값이 아니다.
+// 공통 정책값 (docs/planning-policy.yaml). 기획 확정 기본값이며 건강 효과·감지 성능은 미검증이다.
 export const POLICY = Object.freeze({
   baselineStableSeconds: 5,
   deviationSeconds: 10,
   recoverySeconds: 3,
   rewarningSeconds: 60,
   reportValidSeconds: 1800,
-  retentionDays: 30,
+});
+
+// 딥 모드 연결 시간값은 기획에서 미확정이다(pendingDecisions.connection).
+// 구현을 위해 archive/planning-history의 과거 제안값을 임시로 쓰며, 확정 조건으로 표시하지 않는다.
+export const CONNECTION_PILOT = Object.freeze({
   qrExpirySeconds: 120,
   heartbeatSeconds: 2,
   disconnectSeconds: 6,
@@ -14,40 +18,23 @@ export const POLICY = Object.freeze({
 
 export const WARNING_TEXT = '기준 자세에서 벗어난 상태가 지속되고 있습니다. 자세를 확인해 주세요.';
 
-export const SENSITIVITY_LABELS = { low: '낮음', normal: '보통', high: '높음' };
-
 export const DEFAULT_SETTINGS = Object.freeze({
-  sensitivity: 'normal',
   warningSeconds: POLICY.deviationSeconds,
   rewarningSeconds: POLICY.rewarningSeconds,
-  sound: true,
 });
 
-// 입력 허용 범위 (docs/prd.md 6. 이번 통합의 입력 검증 설계안)
-export const SETTING_RANGES = Object.freeze({
-  warningSeconds: [1, 300],
-  rewarningSeconds: [10, 600],
-});
+export const SETTING_LABELS = { warningSeconds: '경고 시간', rewarningSeconds: '재경고 간격' };
 
-const RANGE_LABELS = { warningSeconds: '경고 시간', rewarningSeconds: '재경고 간격' };
+export const POSITIVE_INTEGER_ERROR = '양의 정수를 입력해 주세요';
 
-/** 설정 입력을 검사한다. 소수·범위 밖·빈 값은 저장하지 않고 이유를 돌려준다. */
+/** 0·소수·음수·빈 값은 저장하지 않는다. 입력 상한은 기획에서 미확정이라 두지 않는다. */
 export function validateSettings(input) {
-  const errors = [];
-  const settings = { ...DEFAULT_SETTINGS };
-
-  if (!(input.sensitivity in SENSITIVITY_LABELS)) errors.push('민감도를 낮음·보통·높음 중에서 골라 주세요.');
-  else settings.sensitivity = input.sensitivity;
-
-  for (const [key, [min, max]] of Object.entries(SETTING_RANGES)) {
+  const errors = {};
+  const settings = {};
+  for (const key of Object.keys(DEFAULT_SETTINGS)) {
     const raw = String(input[key] ?? '').trim();
-    const value = Number(raw);
-    if (!/^\d+$/.test(raw) || value < min || value > max) {
-      errors.push(`${RANGE_LABELS[key]}은 ${min}~${max} 사이의 정수(초)로 입력해 주세요.`);
-    } else {
-      settings[key] = value;
-    }
+    if (!/^\d+$/.test(raw) || Number(raw) < 1) errors[key] = POSITIVE_INTEGER_ERROR;
+    else settings[key] = Number(raw);
   }
-  settings.sound = Boolean(input.sound);
-  return errors.length ? { ok: false, errors } : { ok: true, settings };
+  return Object.keys(errors).length ? { ok: false, errors } : { ok: true, settings };
 }

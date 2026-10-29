@@ -1,0 +1,80 @@
+// 화면들이 함께 쓰는 상태·라우터·카메라·저장. 화면 전환 중에도 카메라와 세션이 끊기지 않도록 한 페이지 안에서 주소만 바꾼다.
+import { APP_ROUTES } from '../../shared/routes.js';
+import { FrontCamera } from './camera.js';
+import { $ } from './format.js';
+
+export const app = {
+  view: '/',
+  store: null,
+  storageError: null,
+  baseline: null,          // 현재 등록 기준 (불변 스냅샷)
+  settingsVersion: null,   // 현재 설정 버전
+  session: null,           // 진행 중이거나 방금 끝난 SessionEngine
+  registration: null,      // { collector, onProgress, onDone } 기준 등록 중일 때
+  recent: [],              // 최근 유효 프레임 (판정 평균용)
+  frame: { quality: 'away', faceFound: false },
+  resuming: false,         // 재개 후 기준·배치 확인 중
+  placementSince: null,
+  lastSave: 0,
+  reportSessionId: null,
+  reportReturn: '/',
+  saveChain: Promise.resolve(true),
+};
+
+export const camera = new FrontCamera($('video'), $('preview'));
+
+const renderers = {};
+const liveRenderers = [];
+
+export const onView = (path, render) => { renderers[path] = render; };
+export const onLive = (render) => { liveRenderers.push(render); };
+
+export function route(path) {
+  app.view = path === '/' || APP_ROUTES.includes(path) ? path : '/';
+  document.querySelectorAll('[data-view]').forEach((section) => {
+    section.hidden = section.dataset.view !== app.view;
+  });
+  placeCamera();
+  renderers[app.view]?.();
+}
+
+export function navigate(path) {
+  if (location.pathname !== path) history.pushState(null, '', path);
+  route(path);
+  window.scrollTo(0, 0);
+}
+
+export function renderLive(now) {
+  liveRenderers.forEach((render) => render(now));
+}
+
+/** 카메라 미리보기는 설정 화면, 그리고 감지 화면의 재등록·재개 확인 중에만 보인다. */
+export function placeCamera() {
+  const box = $('cam-box');
+  let slot = null;
+  if (camera.on && app.view === '/setup') slot = $('setup-cam');
+  if (camera.on && app.view === '/watch' && (!$('rebaseline-panel').hidden || app.resuming)) slot = $('watch-cam');
+  if (slot) slot.append(box);
+  box.hidden = !slot;
+}
+
+/** 저장은 순서대로 한다. 실패하면 false (완료로 표시하지 않는다). */
+export function saveSession(now = Date.now()) {
+  const session = app.session;
+  app.saveChain = app.saveChain.then(async () => {
+    if (!app.store || !session) return false;
+    try {
+      await app.store.saveSession(session, now);
+      app.lastSave = now;
+      return true;
+    } catch (error) {
+      console.error(error);
+      return false;
+    }
+  });
+  return app.saveChain;
+}
+
+export function newId(prefix) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+}

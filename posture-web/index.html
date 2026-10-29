@@ -3,81 +3,204 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>바른목</title>
-  <meta name="description" content="노트북 웹캠으로 거북목을 알려주고, 언제 자세가 무너지는지 정리해 주는 웹 서비스" />
+  <title>패스트거북이</title>
+  <meta name="description" content="노트북 웹캠으로 지속적인 자세 변화를 감지하고 알려줘 자기 조정과 거북목 예방을 돕는 서비스" />
 </head>
 <body>
   <header class="top">
-    <span class="logo">🐢 바른목</span>
+    <a class="logo" href="/" data-link>🐢 패스트거북이</a>
+    <a class="muted" href="/history" data-link>내 기록</a>
   </header>
 
   <main>
-    <section id="intro" class="card hero">
-      <h1>공부하다 거북목이 되면<br />살짝 알려드릴게요</h1>
-      <p>노트북 웹캠으로 자세를 보고, 거북목이 30초 이어지면 알림을 보내요. 오늘 언제, 얼마나 무너졌는지도 정리해 드려요.</p>
+    <!-- / 첫 화면 -->
+    <section data-view="/" class="card hero" hidden>
+      <h1>패스트거북이</h1>
+      <p class="lead">공부에 집중하는 동안 자세 변화를 알려드릴게요.</p>
+      <p>노트북 웹캠으로 등록한 개인 기준 자세와 비교해, 기준에서 벗어난 상태가 이어지면 알려드려요. 거북목 예방을 위한 자세 관리를 스스로 확인할 수 있게 돕고, 기록과 리포트로 돌아볼 수 있어요.</p>
       <ul class="points">
-        <li>설치 없이 브라우저에서 바로</li>
-        <li>영상은 이 기기 밖으로 나가지 않아요</li>
-        <li>처음 한 번 바른 자세 기준만 잡으면 끝</li>
+        <li>로그인 없이 이 PC 브라우저에 기록을 저장해요</li>
+        <li>영상은 이 기기에서만 처리하고 저장하지 않아요</li>
+        <li>기준 자세는 개인 비교 기준이며 의학적 정상 판정이 아니에요</li>
       </ul>
-      <button id="start" class="btn primary">시작하기</button>
-      <p id="start-msg" class="muted" aria-live="polite"></p>
+      <div class="actions">
+        <button class="btn primary" id="home-start">자세 등록하고 시작</button>
+        <button class="btn" id="home-deep">딥 모드 사용하기</button>
+        <button class="btn" id="home-history">내 기록</button>
+      </div>
+      <p class="muted small" id="home-active" hidden>진행 중인 세션이 있어요. <a href="/watch" data-link>감지 화면으로 돌아가기</a></p>
     </section>
 
-    <section id="setup" class="card" hidden>
-      <h2>바른 자세 기준 잡기</h2>
-      <p class="muted">평소처럼 화면을 보며 허리를 펴고 앉아 주세요. 버튼을 누르면 5초 동안 기준을 잡아요.</p>
-      <div id="cam-slot-setup" class="cam-slot"></div>
+    <!-- /setup 카메라 설정 화면 -->
+    <section data-view="/setup" class="card" hidden>
+      <h2>카메라 설정</h2>
+      <p class="muted">평소처럼 화면을 보며 허리를 펴고 앉아 주세요. 얼굴과 양쪽 어깨가 보여야 해요.</p>
+
+      <dl class="facts" aria-label="저장 상태">
+        <div><dt>상태</dt><dd id="setup-state">준비</dd></div>
+        <div><dt>카메라</dt><dd id="setup-camera">꺼짐</dd></div>
+        <div><dt>저장된 기준</dt><dd id="setup-baseline">없음</dd></div>
+        <div><dt>저장된 세션</dt><dd id="setup-sessions">0개</dd></div>
+        <div><dt>현재 배치</dt><dd id="setup-placement">카메라를 켜서 확인이 필요해요</dd></div>
+      </dl>
+
+      <div class="actions">
+        <button class="btn" id="setup-camera-on">카메라 켜기</button>
+      </div>
+      <p class="error" id="setup-camera-error" role="alert" hidden></p>
+
+      <div class="cam-slot" id="setup-cam"></div>
       <ul class="checks">
         <li id="chk-face">얼굴이 보여요</li>
         <li id="chk-shoulder">양쪽 어깨가 보여요</li>
       </ul>
-      <button id="calibrate" class="btn primary" disabled>기준 잡기</button>
-      <p id="calib-msg" class="muted" aria-live="polite"></p>
+
+      <div class="actions">
+        <button class="btn primary" id="setup-register" disabled>기준 자세 등록</button>
+        <button class="btn primary" id="setup-start" disabled>탐지 시작</button>
+      </div>
+      <p id="setup-msg" class="status-line" aria-live="polite"></p>
     </section>
 
-    <section id="monitor" hidden>
-      <div id="status-card" class="card status" data-state="good">
-        <div class="turtle" aria-hidden="true">🐢</div>
-        <div>
-          <p id="state-text" class="state">좋은 자세예요</p>
-          <p id="state-sub" class="muted"></p>
+    <!-- /watch 감지 화면 -->
+    <section data-view="/watch" hidden>
+      <div class="card">
+        <dl class="facts" aria-label="세션 상태">
+          <div><dt>세션 ID</dt><dd id="watch-session">-</dd></div>
+          <div><dt>상태</dt><dd id="watch-state">-</dd></div>
+          <div><dt>인식</dt><dd id="watch-recognition">-</dd></div>
+          <div><dt>모드</dt><dd id="watch-mode">기본</dd></div>
+          <div><dt>유효 감지 시간</dt><dd id="watch-valid">00:00</dd></div>
+          <div><dt>이탈 확인 중</dt><dd id="watch-candidate">-</dd></div>
+        </dl>
+        <p class="warning" id="watch-warning" role="alert" hidden></p>
+        <p class="notice" id="watch-report-ready" role="status" hidden>리포트가 준비됐어요</p>
+        <p class="status-line" id="watch-msg" aria-live="polite"></p>
+        <div class="actions" id="watch-controls">
+          <button class="btn" id="watch-pause">일시 정지</button>
+          <button class="btn" id="watch-resume" hidden>재개</button>
+          <button class="btn" id="watch-settings">설정</button>
+          <button class="btn" id="watch-rebaseline">기준 다시 등록</button>
+          <button class="btn" id="watch-report">리포트 보기</button>
+          <button class="btn danger" id="watch-end">세션 종료</button>
+          <button class="btn" id="watch-basic" hidden>기본 모드로 계속</button>
         </div>
       </div>
-      <p class="muted small">다른 창을 써도 계속 측정해요. 이 탭만 닫지 마세요.</p>
-      <div class="actions">
-        <button id="notify" class="btn">알림 받기</button>
-        <button id="pause" class="btn">일시정지</button>
-        <button id="recal" class="btn">기준 다시 잡기</button>
-        <button id="toggle-cam" class="btn">카메라 보기</button>
+
+      <div class="card" id="settings-panel" hidden>
+        <h3>설정</h3>
+        <p class="muted small">기준 등록 5초·복귀 3초·자동 리포트 유효 30분은 바꿀 수 없어요. 적용하면 진행 중인 이탈은 설정 변경으로 닫고 새 구간으로 판정해요.</p>
+        <label class="field">경고 시간(초)
+          <input id="settings-warning" inputmode="numeric" />
+          <span class="error" id="settings-warning-error" role="alert"></span>
+        </label>
+        <label class="field">재경고 간격(초)
+          <input id="settings-rewarning" inputmode="numeric" />
+          <span class="error" id="settings-rewarning-error" role="alert"></span>
+        </label>
+        <p class="muted small" id="settings-version"></p>
+        <div class="actions">
+          <button class="btn primary" id="settings-apply">적용</button>
+          <button class="btn" id="settings-close">닫기</button>
+        </div>
       </div>
-      <p id="notify-msg" class="muted small" aria-live="polite"></p>
-      <div id="cam-slot-monitor" class="cam-slot"></div>
+
+      <div class="card" id="rebaseline-panel" hidden>
+        <h3>기준 다시 등록</h3>
+        <p class="muted small">등록하는 동안에는 판정하지 않아요. 새 기준이 등록되면 '탐지 재개'를 눌러 주세요.</p>
+        <div class="actions">
+          <button class="btn primary" id="rebaseline-register">기준 자세 등록</button>
+          <button class="btn primary" id="rebaseline-resume" disabled>탐지 재개</button>
+        </div>
+        <p class="status-line" id="rebaseline-msg" aria-live="polite"></p>
+      </div>
+
+      <div class="cam-slot" id="watch-cam"></div>
+
+      <div class="card" id="end-panel" hidden>
+        <h3>세션을 종료했어요</h3>
+        <dl class="facts" aria-label="종료 상태">
+          <div><dt>세션</dt><dd id="end-state">종료</dd></div>
+          <div><dt>카메라</dt><dd id="end-camera">-</dd></div>
+          <div><dt>휴대폰 카메라</dt><dd id="end-phone">-</dd></div>
+          <div><dt>기록</dt><dd id="end-save">-</dd></div>
+        </dl>
+        <div class="actions">
+          <button class="btn primary" id="end-report">리포트 보기</button>
+          <button class="btn" id="end-history">내 기록</button>
+        </div>
+      </div>
     </section>
 
-    <section id="report" class="card">
-      <h2>오늘의 자세</h2>
-      <div class="stats">
-        <div><strong id="r-minutes">-</strong><small>측정 시간</small></div>
-        <div><strong id="r-good">-</strong><small>바른 자세</small></div>
-        <div><strong id="r-turtle">-</strong><small>거북목</small></div>
-        <div><strong id="r-first">-</strong><small>앉은 뒤 처음 무너지기까지</small></div>
+    <!-- /report 리포트 화면 -->
+    <section data-view="/report" class="card" hidden>
+      <h2>리포트</h2>
+      <p class="muted" id="report-summary"></p>
+      <div id="report-list"></div>
+      <div id="report-session"></div>
+      <div class="actions">
+        <button class="btn" id="report-close">닫기</button>
+        <button class="btn" id="report-history">내 기록</button>
       </div>
-      <h3>시간대별 바른 자세 비율</h3>
-      <div id="hourly" class="hourly"></div>
-      <p id="insight" class="insight"></p>
+    </section>
+
+    <!-- /history 내 기록 -->
+    <section data-view="/history" class="card" hidden>
+      <h2>내 기록</h2>
+      <p class="muted small">로그인 없이 이 PC 브라우저에 저장된 기록만 보여요. 브라우저 데이터를 지우면 함께 사라질 수 있어요.</p>
+      <p class="muted" id="history-counts"></p>
+      <p class="muted" id="history-baseline"></p>
+      <p class="empty" id="history-empty" hidden>저장된 기록이 없어요</p>
+      <ul class="session-list" id="history-list"></ul>
+
+      <div id="history-detail" hidden>
+        <h3>세션 상세</h3>
+        <div id="history-detail-body"></div>
+        <p class="status-line" id="history-compare-result" aria-live="polite"></p>
+        <div class="actions">
+          <button class="btn" id="history-report">리포트 보기</button>
+          <button class="btn" id="history-compare">이전 기록과 비교</button>
+          <button class="btn danger" id="history-delete">기록 삭제</button>
+        </div>
+      </div>
+
+      <div class="confirm" id="history-confirm" hidden>
+        <p id="history-confirm-text">이 세션의 기록·리포트를 삭제할까요? 현재 등록 기준과 다른 기록이 쓰는 기준은 남겨요.</p>
+        <label class="field-inline" id="history-confirm-all-option" hidden>
+          <input type="checkbox" id="history-confirm-include" /> 기준 자세·설정도 함께 삭제
+        </label>
+        <div class="actions">
+          <button class="btn danger" id="history-confirm-ok">삭제 확인</button>
+          <button class="btn" id="history-confirm-cancel">취소</button>
+        </div>
+      </div>
+      <p class="error" id="history-error" role="alert" hidden></p>
+      <div class="actions">
+        <button class="btn" id="history-delete-all">전체 삭제</button>
+      </div>
+    </section>
+
+    <!-- /connect, /phone 딥 모드 (별도 커밋에서 구현) -->
+    <section data-view="/connect" class="card" hidden>
+      <h2>딥 모드</h2>
+      <p class="muted">휴대폰을 측면 카메라로 연결하는 딥 모드는 준비 중이에요.</p>
+    </section>
+    <section data-view="/phone" class="card" hidden>
+      <h2>휴대폰 연결</h2>
+      <p class="muted">딥 모드는 준비 중이에요.</p>
     </section>
   </main>
 
   <footer class="muted small">
-    의학적 진단이 아닌 자세 습관 도우미예요. 기록은 이 브라우저에만 저장돼요.
+    개인 기준 대비 자세 변화를 알려주는 예방 목적의 자세 관리 도우미예요. 기준 자세는 의학적 정상 판정이 아니며 진단·치료를 제공하지 않아요.
+    기록은 로그인 없이 이 PC 브라우저에만 저장되며, 공유 PC의 다른 이용자에게서 보호되지 않아요.
   </footer>
 
-  <div id="cam-box" class="cam-box" hidden>
-    <canvas id="preview" width="640" height="480"></canvas>
+  <div class="cam-box" id="cam-box" hidden>
+    <canvas id="preview" width="640" height="480" aria-label="카메라 미리보기"></canvas>
   </div>
   <video id="video" playsinline muted hidden></video>
 
-  <script type="module" src="/src/app.js"></script>
+  <script type="module" src="/src/app/main.js"></script>
 </body>
 </html>

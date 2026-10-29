@@ -18,8 +18,8 @@ export const SESSION_STATE_LABELS = {
 export const RECOGNITION_LABELS = {
   none: '-',
   valid: '유효',
-  away: '자리 비움',
-  unrecognized: '인식 불가',
+  away: '자리 비움 · 판정 보류',
+  unrecognized: '인식 불가 · 판정 보류',
 };
 
 export class SessionEngine {
@@ -35,6 +35,9 @@ export class SessionEngine {
     this.lastT = null;
     this.events = [];
     this.warnings = [];
+    this.holds = [];
+    this.openHold = null;
+    this.stops = [];
     this.reports = [];
     this.windowStartAt = [];
     this.segments = [{ fromValid: 0, at: startedAt, mode, baselineId, settingsVersionId }];
@@ -66,9 +69,15 @@ export class SessionEngine {
     if (this.state !== 'running') return this.#drain();
     this.recognition = quality;
     if (quality !== 'valid') {
+      // 판정 보류: 후보는 버리고 확정 이탈은 그 사유로 닫는다. 확정 이탈 유무와 별개로 보류 구간을 남긴다.
+      if (this.openHold?.reason !== quality) {
+        this.#closeHold(t);
+        this.openHold = { reason: quality, startAt: t, endAt: null, validAt: this.validMs };
+      }
       this.#closeEpisode(quality, t);
       return this.#drain();
     }
+    this.#closeHold(t);
 
     const prev = this.validMs;
     this.validMs += dt;
@@ -140,6 +149,22 @@ export class SessionEngine {
     this.outbox.push({ type: kind === 'first' ? 'warning' : 'rewarning', eventId: ep.id });
   }
 
+  #closeHold(t) {
+    if (!this.openHold) return;
+    this.holds.push({ ...this.openHold, endAt: t });
+    this.openHold = null;
+  }
+
+  /**
+   * 진행을 끊는 사용자·시스템 동작: 보류 구간과 열린 이탈을 닫고, 이탈 유무와 별개로 세션 중단 기록을 남긴다.
+   * (일시 정지·설정/기준/모드 변경·연결 장애. 종료는 세션 상태로 남는다)
+   */
+  #stop(reason, t) {
+    this.#closeHold(t);
+    this.#closeEpisode(reason, t);
+    if (reason !== 'ended') this.stops.push({ reason, at: t, validAt: this.validMs, mode: this.mode });
+  }
+
   #closeEpisode(reason, t) {
     const ep = this.episode;
     if (!ep) return;
@@ -169,7 +194,7 @@ export class SessionEngine {
 
   pause(t) {
     if (this.state === 'running') {
-      this.#closeEpisode('paused', t);
+      this.#stop('paused', t);
       this.state = 'paused';
       this.recognition = 'none';
     }
@@ -179,7 +204,7 @@ export class SessionEngine {
   /** 재개는 장치·기준 확인 뒤 시작하므로 먼저 준비 상태로 돌린다. */
   prepare(t) {
     if (this.state !== 'ended') {
-      if (this.state === 'running') this.#closeEpisode('paused', t);
+      if (this.state === 'running') this.#stop('paused', t);
       this.state = 'ready';
       this.recognition = 'none';
       this.lastT = null;
@@ -188,7 +213,7 @@ export class SessionEngine {
   }
 
   applySettings(t, settings, settingsVersionId) {
-    this.#closeEpisode('settings_change', t);
+    this.#stop('settings_change', t);
     this.settings = settings;
     this.#segment(t, { settingsVersionId });
     return this.#drain();
@@ -196,7 +221,7 @@ export class SessionEngine {
 
   /** 기준 다시 등록: 진행 이탈을 기준 변경으로 닫고 준비로. "탐지 재개" 전에는 자동 재개하지 않는다. */
   beginRebaseline(t) {
-    this.#closeEpisode('baseline_change', t);
+    this.#stop('baseline_change', t);
     this.state = 'ready';
     this.recognition = 'none';
     this.lastT = null;
@@ -210,7 +235,7 @@ export class SessionEngine {
 
   setMode(t, mode) {
     if (mode !== this.mode) {
-      this.#closeEpisode('mode_change', t);
+      this.#stop('mode_change', t);
       this.mode = mode;
       this.#segment(t, { mode });
     }
@@ -220,7 +245,7 @@ export class SessionEngine {
   /** 딥 모드 연결 장애: 판정·유효 시간을 멈추고 복구 대기 */
   enterRecovery(t) {
     if (this.state === 'running') {
-      this.#closeEpisode('disconnected', t);
+      this.#stop('disconnected', t);
       this.state = 'recovering';
       this.recognition = 'none';
     }
@@ -229,7 +254,7 @@ export class SessionEngine {
 
   end(t, reason = 'user') {
     if (this.state === 'ended') return this.#drain();
-    this.#closeEpisode('ended', t);
+    this.#stop('ended', t);
     const lastBoundary = this.nextBoundary - this.reportMs;
     if (this.validMs > lastBoundary) {
       this.#createReport(lastBoundary / this.reportMs, 'final', t);
@@ -250,13 +275,20 @@ export class SessionEngine {
   // ------------------------------------------------------------ 리포트
 
   #ledger() {
-    return { events: this.events, warnings: this.warnings, candidate: this.episode?.status === 'candidate' ? this.episode : null, validNow: this.validMs };
+    return {
+      events: this.events,
+      warnings: this.warnings,
+      holds: this.openHold ? [...this.holds, this.openHold] : this.holds,
+      candidate: this.episode?.status === 'candidate' ? this.episode : null,
+      validNow: this.validMs,
+    };
   }
 
+  /** @returns [start, end, options] 자동 리포트는 [시작, 끝), 종료 리포트는 끝 시점의 보류까지 포함 */
   #window(report) {
     const start = report.index * this.reportMs;
     const end = report.kind === 'auto' ? start + this.reportMs : this.validMs;
-    return [start, Math.max(end, start)];
+    return [start, Math.max(end, start), { includeEnd: report.kind !== 'auto' }];
   }
 
   #createReport(index, kind, t) {
@@ -272,10 +304,10 @@ export class SessionEngine {
       endAt: t,
       mode: this.mode,
     };
-    const [start, end] = this.#window(report);
+    const [start, end, options] = this.#window(report);
     report.startValid = start;
     report.endValid = end;
-    report.metrics = windowMetrics(this.#ledger(), start, end);
+    report.metrics = windowMetrics(this.#ledger(), start, end, options);
     this.reports.push(report);
     this.outbox.push({ type: 'report', reportId: report.id, kind });
   }
@@ -284,8 +316,8 @@ export class SessionEngine {
   #refreshReports(t) {
     for (const report of this.reports) {
       if (report.kind !== 'auto') continue;
-      const [start, end] = this.#window(report);
-      const metrics = windowMetrics(this.#ledger(), start, end);
+      const [start, end, options] = this.#window(report);
+      const metrics = windowMetrics(this.#ledger(), start, end, options);
       if (JSON.stringify(metrics) !== JSON.stringify(report.metrics)) {
         report.metrics = metrics;
         report.revision += 1;
