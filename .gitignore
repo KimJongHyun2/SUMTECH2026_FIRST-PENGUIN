@@ -1,0 +1,19 @@
+# 비밀값
+.env
+.env.*
+!.env.example
+
+# 의존성·빌드 산출물
+node_modules/
+.next/
+dist/
+build/
+coverage/
+
+# E2E 결과물
+e2e/test-results/
+e2e/playwright-report/
+
+# OS·에디터
+.DS_Store
+Thumbs.db

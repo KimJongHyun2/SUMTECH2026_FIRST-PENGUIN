@@ -1,0 +1,86 @@
+# FIRST-PENGUIN 팀 문제정의 (docs/problem.yaml)
+# 상태: 저장소 준비 완료. 새 아이디어의 문제정의를 시작하기 전 기본 양식이에요.
+# null / [] 칸은 아직 팀 답이 없는 곳이에요. 지어내서 채우지 않아요.
+# 대시보드가 main 브랜치에 push된 이 파일을 직접 읽어요.
+
+# 긴 문장은 | 또는 |-로 줄바꿈을 보존하세요.
+
+statement: null # 캔버스 위의 한 문장 문제정의 — 학생 답 대기
+canvas:
+  context: null # 왼쪽 위: 문제가 발생하는 상황 — 학생 답 대기
+  customer: null # 왼쪽 아래: 그 상황을 겪는 고객 — 학생 답 대기
+  root_problem: null # 가운데 위: 근본 문제 (우리 앱 기능이 없어서가 아니라 실제로 겪는 어려움)
+  impact:
+    feeling: null # 가운데 아래: 감정적 영향
+    measurable: null # 가운데 아래: 확인된 실질적 영향 (출처 없는 수치는 쓰지 않음)
+  alternatives: []
+  # 지금 쓰는 방법마다 [] 대신 아래 형태의 항목을 작성합니다.
+  # - how_used: null # 오른쪽 위: 현재 대안과 사용하는 방식
+  #   shortcoming: null # 오른쪽 아래: 위 대안의 단점 (같은 항목 안에 짝지음)
+  #   why_ours: null # 이 대안 대신 우리 해법이어야 하는 이유
+  # 예:
+  # - how_used: 단톡방에 영수증 사진을 올리고 한 명이 계산기로 나눠 송금을 요청한다
+  #   shortcoming: 사진이 대화에 묻혀 누가 냈는지 매번 다시 찾고, 계산한 사람만 부담을 진다
+  #   why_ours: 영수증을 올리는 순간 각자 낼 금액과 미정산 내역이 남아 다시 계산할 필요가 없다
+  # - how_used: 범용 AI 챗봇에 영수증 내용을 붙여 넣고 나눠 달라고 한다
+  #   shortcoming: 대화가 끝나면 결과가 남지 않고, 지난달 미정산분과 이어지지 않는다
+  #   why_ours: 같은 집 구성원의 정산 기록을 누적해 다음 달까지 이어서 보여 준다
+personas: []
+# 실제 기록이 있을 때만 []를 아래 항목 목록으로 바꿉니다.
+# - id: P1
+#   description: null
+#   source: null
+experiences: []
+# 팀원이 직접 겪은 일을 언제·어떤 장면·어떻게 대응했는지까지 구체적으로 씁니다.
+# - id: E1
+#   when: null
+#   what_happened: null
+#   workaround: null
+#   feeling: null
+#   quote: null
+#   source: null
+# 예:
+# - id: E1
+#   when: 지난 학기 말, 셋이 사는 자취방의 공과금 고지서가 온 날
+#   what_happened: 전기·가스·인터넷 요금을 누가 먼저 냈는지 몰라 단톡방 기록을 30분 넘게 거슬러 올라갔다
+#   workaround: 한 명이 엑셀 표를 만들었지만 두 달 뒤 아무도 갱신하지 않았다
+#   feeling: 돈 이야기를 다시 꺼내는 게 민망했다
+#   quote: "저번 달 인터넷비 내가 낸 거 맞지?"
+#   source: 팀원 A 본인 경험
+sources: []
+# 외부 자료는 로그인 없이 열리는 URL을 https://부터 그대로 적습니다.
+# claim에는 그 자료가 직접 말하는 내용만 쓰고 숫자는 원문 그대로 옮깁니다. URL을 지어내지 않습니다.
+# - id: R1
+#   url: null
+#   title: null
+#   claim: null # 이 자료로 뒷받침하는 주장
+# 예 (주소는 실제로 연 자료로 바꿉니다):
+# - id: R1
+#   url: https://example.com/실제로-연-기사-주소
+#   title: 기사·보고서 제목
+#   claim: 원문에 적힌 그대로의 사실 한 문장
+five_whys:
+  symptom: null
+  whys: [] # 기록된 인과 설명의 문자열 목록. 반드시 5개일 필요는 없습니다.
+solution_paths: []
+# - path: null
+#   status: chosen # chosen / rejected / deferred 중 실제 결정
+#   reason: null
+insight:
+  claim: null # 관찰에서 도출한 주장
+  evidence: null # 실제 근거 (experiences id·sources id를 함께 적으면 좋습니다)
+  design_decision: null # 이 근거로 내린 제품 결정
+features: []
+# 제품에 들어갈 기능 명세. 팀이 고른 해법에서 나온 기능만 씁니다.
+# 기능을 추가하려면 먼저 여기에 추가한 뒤 구현합니다. 서비스에 로그인이 있으면 회원가입·로그인도 포함합니다.
+# - id: F1
+#   name: null
+#   input: null # 사용자가 넣는 것
+#   output: null # 처리 후 저장되거나 보이는 결과
+#   done: null # 관찰할 수 있는 완료 조건
+# 예:
+# - id: F1
+#   name: 영수증 금액 나누기
+#   input: 금액·항목·낸 사람·나눌 사람
+#   output: 사람별로 낼 금액과 미정산 합계가 저장된다
+#   done: 30000원을 셋이 나누면 각자 10000원이 표시되고, 다시 접속해도 미정산 합계가 같다. 금액이 비어 있으면 저장되지 않고 이유를 보여 준다.
