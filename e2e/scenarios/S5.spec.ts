@@ -53,11 +53,16 @@ test("S5 대학생이 딥 모드에서 경고와 복귀 후 종료 리포트를 
   await expect(fact(card, "최초 경고")).toHaveText("1회")
   await expect(fact(card, "정상 복귀")).toHaveText("1회")
   await expect(fact(card, "재경고")).toHaveText("0회")
-  // 화면의 초는 반올림 값이라 비율은 ±1%p 안에서 D/V*100과 맞는지 본다.
+  // 화면의 초·%는 반올림 값이다. 유효 시간이 짧으면 ±0.5초만으로 D/V가 수 %p 달라지므로
+  // 표시된 초가 나타내는 범위에서 가능한 비율 구간(표시 % 반올림 0.5%p 포함) 안에 있는지 본다.
   const valid = await numberIn(fact(card, "유효 감지 시간"))
   const deviation = await numberIn(fact(card, "이탈 시간"))
   expect(deviation).toBeGreaterThanOrEqual(10)
-  expect(Math.abs(await numberIn(fact(card, "이탈 비율")) - (deviation / valid) * 100)).toBeLessThanOrEqual(1.5)
+  const ratio = await numberIn(fact(card, "이탈 비율"))
+  const lowest = ((deviation - 0.5) / (valid + 0.5)) * 100 - 0.5
+  const highest = Math.min(100, ((deviation + 0.5) / Math.max(valid - 0.5, deviation - 0.5)) * 100) + 0.5
+  expect(ratio).toBeGreaterThanOrEqual(lowest)
+  expect(ratio).toBeLessThanOrEqual(highest)
   await expect(fact(card, "딥 모드")).toContainText("유효")
   await expect(page.locator("#report-session")).toContainText("휴대폰 촬영 종료: 촬영 종료 확인됨 · 측면 모의 응답")
 })
