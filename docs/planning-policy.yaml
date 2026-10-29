@@ -1,8 +1,10 @@
 # 현재 기획의 정책·용어 기준이다. 과거 원문·미채택 제안값은 archive/planning-history/에 보존한다.
-version: 2026-10-30-v4
+version: 2026-10-30-v5
 status: 사용자 지정 정책을 반영한 기획 확정본; 구현·기기·사용성 검증 전
 source: 2026-10-30 최신 사용자 요청의 시간값·인식 중단·로그인 없는 PC 브라우저 로컬 저장 원칙
 serviceName: 패스트거북이
+servicePurpose: 지속적인 자세 이탈을 감지하고 알려줘 사용자가 스스로 자세를 관리하고 거북목을 예방하도록 돕는다. 예방 효과는 검증 대상이다.
+riskDetectionScope: 개인 기준 대비 자세 변화가 지속되는 상황을 감지한다. 거북목 발병 가능성·의학적 위험도 계산·진단·치료를 뜻하지 않는다.
 planningScore:
   maximum: 30
   current: 14.6

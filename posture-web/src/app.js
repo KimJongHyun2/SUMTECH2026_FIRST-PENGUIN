@@ -11,15 +11,15 @@ const NEW_SESSION_AFTER_AWAY_MS = 2 * 60_000;
 const SAVE_EVERY_MS = 10_000;
 
 const STATE_TEXT = {
-  good: ['좋은 자세예요', '지금처럼만 유지해요'],
-  warn: ['목이 조금 앞으로 나왔어요', '턱을 살짝 당겨 보세요'],
-  bad: ['거북목이에요', '머리를 뒤로, 어깨를 펴 주세요'],
-  bow: ['고개를 숙이고 있어요', '필기 중이라면 괜찮아요'],
+  good: ['기준 범위 안에 있어요', '등록한 기준과 비슷한 자세예요'],
+  warn: ['기준 대비 머리가 조금 앞으로 나왔어요', '자세를 확인해 주세요'],
+  bad: ['거북목이에요', '자세를 확인해 주세요'],
+  bow: ['기준 대비 고개를 숙이고 있어요', '작업 상황과 자세를 확인해 주세요'],
   away: ['자리를 비웠어요', '돌아오면 다시 측정해요'],
 };
 const ALERT_TEXT = {
-  warn: ['목이 앞으로 나와 있어요', '30초째 거북목 자세예요. 턱을 살짝 당겨 보세요.'],
-  bad: ['거북목 경고', '30초째 머리가 많이 앞으로 나와 있어요. 등을 펴고 머리를 뒤로 당겨 주세요.'],
+  warn: ['자세 변화가 지속되고 있어요', '30초째 기준보다 머리가 앞으로 나와 있어요. 자세를 확인해 주세요.'],
+  bad: ['자세 확인 알림', '30초째 기준보다 머리가 많이 앞으로 나와 있어요. 자세를 확인해 주세요.'],
   bow: ['고개를 오래 숙이고 있어요', '1분 30초째 고개를 숙이고 있어요. 잠깐 고개를 들어 쉬어 주세요.'],
 };
 
@@ -246,7 +246,7 @@ function renderState(cls, now) {
   $('status-card').dataset.state = cls;
   $('state-text').textContent = title;
   $('state-sub').textContent = `${sub} · ${fmtDuration(now - current.since)}째`;
-  document.title = cls === 'warn' || cls === 'bad' ? '🐢 거북목 주의 · 바른목' : '바른목';
+  document.title = cls === 'warn' || cls === 'bad' ? '🐢 자세 확인 · 패스트거북이' : '패스트거북이';
 }
 
 function renderReport() {
@@ -260,7 +260,7 @@ function renderReport() {
   $('hourly').innerHTML = s.hourly.length
     ? s.hourly.map((h) => {
         const pct = Math.round((h.goodRatio ?? 0) * 100);
-        return `<div class="bar" title="${h.hour}시 · 바른 자세 ${pct}% · ${fmtMinutes(h.minutes)} 측정">
+        return `<div class="bar" title="${h.hour}시 · 기준 범위 내 ${pct}% · ${fmtMinutes(h.minutes)} 측정">
           <div class="fill${pct < 60 ? ' low' : ''}" style="height:${pct}%"></div><span>${h.hour}시</span></div>`;
       }).join('')
     : '<p class="empty">아직 오늘 기록이 없어요. 측정을 시작해 보세요.</p>';
@@ -268,12 +268,12 @@ function renderReport() {
   const tips = [];
   if (s.avgFirstSlouchMinutes !== null) {
     const every = Math.max(10, Math.floor(s.avgFirstSlouchMinutes / 5) * 5);
-    tips.push(`앉은 뒤 평균 ${fmtMinutes(s.avgFirstSlouchMinutes)} 만에 자세가 무너져요. ${every}분마다 한 번씩 일어나 목을 풀어 주세요.`);
+    tips.push(`앉은 뒤 평균 ${fmtMinutes(s.avgFirstSlouchMinutes)} 만에 머리 전방 이탈이 감지됐어요. ${every}분마다 한 번씩 일어나 목을 풀어 주세요.`);
   }
   const counted = s.hourly.filter((h) => h.minutes >= 5);
   if (counted.length >= 2) {
     const worst = counted.reduce((a, b) => (b.goodRatio < a.goodRatio ? b : a));
-    tips.push(`${worst.hour}시대에 자세가 가장 많이 무너졌어요.`);
+    tips.push(`${worst.hour}시대에 기준 범위를 벗어난 비율이 가장 높았어요.`);
   }
   $('insight').textContent = tips.join(' ');
 }
