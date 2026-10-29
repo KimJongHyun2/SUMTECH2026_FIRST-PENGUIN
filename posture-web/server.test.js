@@ -16,6 +16,8 @@ beforeAll(async () => {
   writeFileSync(join(dir, 'assets', 'app.js'), 'console.log(1)');
   mkdirSync(join(dir, 'mediapipe'));
   writeFileSync(join(dir, 'mediapipe', 'x.wasm'), 'wasm');
+  mkdirSync(join(dir, 'eval'));
+  writeFileSync(join(dir, 'eval', 'test-pose.webm'), 'webm');
   server = createAppServer({ distDir: dir, releaseId: 'abc123' });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   base = `http://127.0.0.1:${server.address().port}`;
@@ -62,5 +64,26 @@ describe('server', () => {
   it('GET·HEAD 외에는 405', async () => {
     const res = await fetch(`${base}/__health`, { method: 'POST' });
     expect(res.status).toBe(405);
+    expect(res.headers.get('allow')).toBe('GET, HEAD');
+  });
+
+  it('HEAD /__health도 본문 없이 200·no-store', async () => {
+    const res = await fetch(`${base}/__health`, { method: 'HEAD' });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(await res.text()).toBe('');
+  });
+
+  it('평가 빌드의 녹화 입력은 video/webm으로, 없는 평가 자료는 404로 준다', async () => {
+    const video = await fetch(`${base}/eval/test-pose.webm`);
+    expect(video.status).toBe(200);
+    expect(video.headers.get('content-type')).toBe('video/webm');
+    const missing = await fetch(`${base}/eval/test-pose.manifest.json`);
+    expect(missing.status).toBe(404);
+  });
+
+  it('업그레이드가 아닌 /relay 요청은 404', async () => {
+    const res = await fetch(`${base}/relay?role=pc`);
+    expect(res.status).toBe(404);
   });
 });

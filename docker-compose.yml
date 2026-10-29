@@ -8,6 +8,8 @@ services:
       context: .
       args:
         RELEASE_ID: ${RELEASE_ID:-dev}
+        # 주최 측 실행은 평가 전용 빌드로 띄운다. /?mode=eval로 연 탭에서만 녹화 입력·테스트 도구가 켜진다.
+        EVAL_ENABLED: ${EVAL_ENABLED:-true}
     ports:
       - "3000:3000"
     environment:
