@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>바른목</title>
+  <meta name="description" content="노트북 웹캠으로 거북목을 알려주고, 언제 자세가 무너지는지 정리해 주는 웹 서비스" />
+</head>
+<body>
+  <header class="top">
+    <span class="logo">🐢 바른목</span>
+    <a class="muted" href="/lab.html">실험 도구</a>
+  </header>
+
+  <main>
+    <section id="intro" class="card hero">
+      <h1>공부하다 거북목이 되면<br />살짝 알려드릴게요</h1>
+      <p>노트북 웹캠으로 자세를 보고, 거북목이 30초 이어지면 알림을 보내요. 오늘 언제, 얼마나 무너졌는지도 정리해 드려요.</p>
+      <ul class="points">
+        <li>설치 없이 브라우저에서 바로</li>
+        <li>영상은 이 기기 밖으로 나가지 않아요</li>
+        <li>처음 한 번 바른 자세 기준만 잡으면 끝</li>
+      </ul>
+      <button id="start" class="btn primary">시작하기</button>
+      <p id="start-msg" class="muted" aria-live="polite"></p>
+    </section>
+
+    <section id="setup" class="card" hidden>
+      <h2>바른 자세 기준 잡기</h2>
+      <p class="muted">평소처럼 화면을 보며 허리를 펴고 앉아 주세요. 버튼을 누르면 5초 동안 기준을 잡아요.</p>
+      <div id="cam-slot-setup" class="cam-slot"></div>
+      <ul class="checks">
+        <li id="chk-face">얼굴이 보여요</li>
+        <li id="chk-shoulder">양쪽 어깨가 보여요</li>
+      </ul>
+      <button id="calibrate" class="btn primary" disabled>기준 잡기</button>
+      <p id="calib-msg" class="muted" aria-live="polite"></p>
+    </section>
+
+    <section id="monitor" hidden>
+      <div id="status-card" class="card status" data-state="good">
+        <div class="turtle" aria-hidden="true">🐢</div>
+        <div>
+          <p id="state-text" class="state">좋은 자세예요</p>
+          <p id="state-sub" class="muted"></p>
+        </div>
+      </div>
+      <p class="muted small">다른 창을 써도 계속 측정해요. 이 탭만 닫지 마세요.</p>
+      <div class="actions">
+        <button id="notify" class="btn">알림 받기</button>
+        <button id="pause" class="btn">일시정지</button>
+        <button id="recal" class="btn">기준 다시 잡기</button>
+        <button id="toggle-cam" class="btn">카메라 보기</button>
+      </div>
+      <p id="notify-msg" class="muted small" aria-live="polite"></p>
+      <div id="cam-slot-monitor" class="cam-slot"></div>
+    </section>
+
+    <section id="report" class="card">
+      <h2>오늘의 자세</h2>
+      <div class="stats">
+        <div><strong id="r-minutes">-</strong><small>측정 시간</small></div>
+        <div><strong id="r-good">-</strong><small>바른 자세</small></div>
+        <div><strong id="r-turtle">-</strong><small>거북목</small></div>
+        <div><strong id="r-first">-</strong><small>앉은 뒤 처음 무너지기까지</small></div>
+      </div>
+      <h3>시간대별 바른 자세 비율</h3>
+      <div id="hourly" class="hourly"></div>
+      <p id="insight" class="insight"></p>
+    </section>
+  </main>
+
+  <footer class="muted small">
+    의학적 진단이 아닌 자세 습관 도우미예요. 기록은 이 브라우저에만 저장돼요.
+  </footer>
+
+  <div id="cam-box" class="cam-box" hidden>
+    <canvas id="preview" width="640" height="480"></canvas>
+  </div>
+  <video id="video" playsinline muted hidden></video>
+
+  <script type="module" src="/src/app.js"></script>
+</body>
+</html>

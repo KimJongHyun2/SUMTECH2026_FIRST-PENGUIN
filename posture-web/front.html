@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>T1 정면 웹캠</title>
+</head>
+<body>
+  <h1>T1 정면 웹캠 판별 <span class="status" id="relay">중계 연결 중...</span></h1>
+
+  <details class="phone" open>
+    <summary>폰 연결 (옆모습 카메라)</summary>
+    <div class="row">
+      <canvas id="qr" width="180" height="180"></canvas>
+      <div>
+        <p class="hint">폰 카메라로 QR을 찍으면 옆모습 페이지가 열립니다. 폰과 노트북이 같은 Wi-Fi(또는 폰 핫스팟)여야 합니다.</p>
+        <select id="lan" hidden></select>
+        <p class="status" id="qr-url"></p>
+      </div>
+    </div>
+  </details>
+
+  <div class="row">
+    <button class="primary" id="start">카메라 시작</button>
+    <span class="status" id="status">대기</span>
+  </div>
+
+  <div class="row">
+    <input id="participant" placeholder="참여자 (예: p1)" size="12" />
+    <select id="label">
+      <option>바른자세</option>
+      <option>거북목_약</option>
+      <option>거북목_강</option>
+      <option>고개숙임</option>
+      <option>의자당김</option>
+      <option>필기</option>
+      <option>보정_연속</option>
+      <option>기타</option>
+    </select>
+    <button id="baseline">기준 잡기 (5초)</button>
+    <button id="record">기록 시작</button>
+    <button id="download">CSV 저장</button>
+    <button id="clear">기록 비우기</button>
+    <span class="status" id="count">0행</span>
+  </div>
+
+  <video id="video" playsinline muted></video>
+  <canvas id="overlay" width="640" height="480"></canvas>
+
+  <table>
+    <thead><tr><th>신호</th><th>현재</th><th>기준</th><th>변화</th></tr></thead>
+    <tbody id="values"></tbody>
+  </table>
+  <p class="status" id="meta"></p>
+
+  <p class="hint">
+    라벨을 고른 뒤 "기록 시작" → 30초 유지 → "기록 중지"를 반복합니다. 라벨은 기록 중에도 바꿀 수 있습니다.
+    pitch는 좌표계에 따라 부호가 반대일 수 있으니 고개를 숙였을 때 값이 어느 쪽으로 움직이는지 먼저 확인하세요.
+    폰의 옆모습 페이지가 켜져 있으면 옆모습 각도도 함께 기록됩니다 (T3).
+  </p>
+
+  <script type="module" src="/src/front.js"></script>
+</body>
+</html>
