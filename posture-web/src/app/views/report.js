@@ -1,5 +1,5 @@
 // /report 리포트 화면: 자동·종료 리포트(F6), 판정 보류·중단 기록(F4·F10)
-import { SESSION_STATE_LABELS } from '../../core/engine.js';
+import { SESSION_STATE_LABELS, phoneStopText } from '../../core/engine.js';
 import { END_REASON_LABELS, HOLD_REASON_LABELS } from '../../core/report.js';
 import { app, navigate, onView } from '../ctx.js';
 import { $, clock, dateTime, percent, renderFacts, seconds } from '../format.js';
@@ -104,6 +104,9 @@ function sessionSection(engine) {
   const stopText = Object.entries(countBy(stops, 'reason'))
     .map(([reason, n]) => `${STOP_LABELS[reason] ?? reason} ${n}회`).join(', ') || '없음';
   box.append(el('p', null, `중단 기록: ${stopText}`));
+  // 딥 모드: 휴대폰 촬영 종료 요청과 실제 확인을 구분해 남긴다 (docs/prd.md 6절 6).
+  const phoneStop = phoneStopText(engine.phoneStop, engine.testMarks);
+  if (phoneStop) box.append(el('p', null, `휴대폰 촬영 종료: ${phoneStop}`));
   return box;
 }
 

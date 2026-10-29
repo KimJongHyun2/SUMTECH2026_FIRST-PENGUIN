@@ -50,7 +50,9 @@ try {
   // 운영 기본값과 명시된 파일럿을 코드와 대조한다. 파일럿의 제품 승인을 뜻하지 않는다.
   const defaults = { ...POLICY, qrExpirySeconds: CONNECTION_PILOT.qrExpirySeconds };
   for (const [key, seconds] of Object.entries(defaults)) {
-    assert(Number.isSafeInteger(seconds) && seconds > 0, `운영 기본값 ${key}`);
+    // 짧은 가림 유예는 0이 '유예 없음(즉시 초기화)'이라 0을 허용한다. 나머지 시간값은 양의 정수다.
+    const minimum = key === 'recognitionGraceSeconds' ? 0 : 1;
+    assert(Number.isSafeInteger(seconds) && seconds >= minimum, `운영 기본값 ${key}`);
     const row = prd.split('\n').find((line) => line.startsWith(`| \`${key}\` |`));
     assert(row, `PRD 정책 행 누락: ${key}`);
     assert.equal(row.split('|')[2].trim(), `${seconds}초`, `PRD/코드 기본값 불일치: ${key}`);

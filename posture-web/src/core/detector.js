@@ -5,7 +5,7 @@ import { POLICY, SENSITIVITY } from './policy.js';
 export const MODEL_VERSION = 'pose_landmarker_lite/float16/1+face_landmarker/float16/1';
 
 export const LIMITS = Object.freeze({ headForward: 0.025, neckLen: 0.035, pitch: 20 });
-const MIN_VISIBILITY = 0.5;
+export const MIN_VISIBILITY = 0.5;
 
 // 배치 확인. 노트북 앞에 앉은 사용자는 어깨가 화면 폭의 약 40%를 차지했고(p1 녹화),
 // 자리를 비웠을 때 뒤쪽에서 잡힌 다른 사람은 2% 이하였다. 경계는 실측 대상인 파일럿 값이다.
@@ -79,6 +79,11 @@ export class BaselineCollector {
     this.invalidSince = null;
   }
 
+  /** 밖의 조건(예: 딥 모드 측면 입력)이 끊기거나 흔들렸을 때 처음부터 다시 모은다. */
+  restart() {
+    return this.#restart();
+  }
+
   #restart() {
     if (this.samples.length) this.restarts += 1;
     this.#clear();
@@ -89,7 +94,8 @@ export class BaselineCollector {
   push(t, sample) {
     if (frameQuality(sample) !== 'valid') {
       this.invalidSince ??= t;
-      if (!this.samples.length || t - this.invalidSince > this.graceMs) return this.#restart();
+      const withinGrace = this.graceMs > 0 && t - this.invalidSince <= this.graceMs;
+      if (!this.samples.length || !withinGrace) return this.#restart();
       return { status: 'paused', progress: this.stableMs / this.needMs };
     }
     if (this.#unstable(sample)) return this.#restart();

@@ -1,138 +1,181 @@
-// /phone 휴대폰 측면 카메라 (F8·F10): QR 토큰으로 연결을 요청하고, PC 승인 뒤 옆모습 각도·품질·시각만 보낸다.
-// 촬영 종료 요청을 받으면 카메라를 끈 뒤에만 확인을 보낸다. PC와 연결이 끊기면 스스로 촬영을 멈춘다.
-// 휴대폰에는 기록을 저장하지 않는다.
-import { CONNECTION_PILOT } from '../../../shared/deep-protocol.js';
-import { largestPose, sideAngle } from '../../signals.js';
-import { createPose, startCamera } from '../../vision.js';
-import { relayUrl } from '../deeplink.js';
+// /phone 휴대폰 측면 카메라 (F8·F10, docs/prd.md 6절): 연결 요청 → PC 승인 → 측면 촬영·전송 → 종료 요청 시 촬영 종료·확인
+// 이 화면은 저장소를 열지 않고 기록을 남기지 않는다. 승인 전에는 카메라를 켜지 않는다.
+import { ERRORS, TOKEN_PATTERN } from '../../../shared/deep-protocol.js';
+import { cameraErrorMessage } from '../camera.js';
 import { onView } from '../ctx.js';
-import { $ } from '../format.js';
+import { PhoneLink } from '../deep-link.js';
+import { $, show } from '../format.js';
+import { SideCamera } from '../side-camera.js';
 
-const SEND_EVERY_MS = 400;
-const MIN_VISIBILITY = 0.5;
-const video = $('phone-video');
+// 초당 4회 + heartbeat. 서버 한도(초당 20개) 안에서 PC의 1초 동기화 허용 오차를 넉넉히 채운다.
+const SEND_MS = 250;
 
-const phone = {
-  ws: null,
-  offset: 0,
-  state: '요청 전',
-  linked: false,
-  seq: 0,
-  pose: null,
-  timer: null,
-  pinger: null,
-  lastServerAt: 0,
+const STATE_LABELS = {
+  idle: '-',
+  connecting: '연결 서버 접속 중',
+  ready: '연결 요청 전',
+  requesting: '연결 요청 중',
+  pending: 'PC 승인 대기',
+  linked: '연결됨',
+  stopped: '촬영 종료',
+  revoked: '연결 끊김',
+  rejected: '연결 거절됨',
+  offline: '연결 서버 끊김',
 };
 
-const token = () => new URLSearchParams(location.search).get('token');
+const STATUS_TEXT = {
+  connecting: '연결 서버에 접속하고 있어요…',
+  ready: "'연결 요청'을 누르면 PC 화면에 요청이 표시돼요",
+  requesting: '연결을 요청하고 있어요…',
+  pending: "PC 화면에서 '연결 승인'을 눌러 주세요",
+  linked: "PC에서 승인했어요. '측면 촬영 시작'을 누르고 휴대폰을 옆에 세워 귀와 어깨가 옆모습으로 보이게 해 주세요",
+  offline: '연결 서버에 접속할 수 없어요. PC 화면의 QR 주소로 열었는지 확인해 주세요',
+};
 
-function render(message) {
-  if (message !== undefined) $('phone-msg').textContent = message;
-  $('phone-state').textContent = phone.state;
-  $('phone-camera-state').textContent = phone.timer ? '켜짐' : '꺼짐';
-  $('phone-request').disabled = Boolean(phone.ws) || !token();
-  $('phone-camera').disabled = !phone.linked || Boolean(phone.timer);
+const END_TEXT = {
+  stopped: '촬영을 종료했어요. 이 창을 닫아도 돼요',
+  pc_closed: 'PC 화면이 닫혀 연결이 끊겼어요. 촬영을 멈췄어요. 다시 쓰려면 PC의 새 QR을 찍어 주세요',
+  pc_timeout: 'PC 응답이 끊겨 연결을 해제했어요. 촬영을 멈췄어요. 다시 쓰려면 PC의 새 QR을 찍어 주세요',
+  stop_timeout: '종료 확인이 늦어 연결을 해제했어요. 촬영을 멈췄어요',
+  closed: '연결 서버와 연결이 끊겨 촬영을 멈췄어요. 다시 쓰려면 PC의 새 QR을 찍어 주세요',
+};
+
+let link = null;
+let camera = null;
+let token = null;
+let timer = null;
+let wakeLock = null;
+let last = null;
+let message = '';
+let error = '';
+let ended = false; // 종료 요청·연결 해제를 받았으면 다시 촬영하지 않는다
+
+function stopCapture() {
+  clearInterval(timer);
+  timer = null;
+  camera?.stop();
+  wakeLock?.release().catch(() => {});
+  wakeLock = null;
+  last = null;
 }
 
-function send(message) {
-  if (phone.ws?.readyState === 1) phone.ws.send(JSON.stringify(message));
+function capture() {
+  last = camera.analyze();
+  link.sendSide(last);
+  camera.draw(last.landmarks);
+  render();
 }
 
-/** 카메라를 끄고 전송을 멈춘다. 종료 확인은 이 함수가 끝난 뒤에만 보낸다. */
-function stopCamera() {
-  clearInterval(phone.timer);
-  phone.timer = null;
-  video.srcObject?.getTracks().forEach((track) => track.stop());
-  video.srcObject = null;
-}
-
-function unlink(state, message) {
-  phone.linked = false;
-  phone.state = state;
-  stopCamera();
-  render(message);
-}
-
-function receive(m) {
-  phone.lastServerAt = Date.now();
-  if (m.type === 'hello' || m.type === 'pong') phone.offset = m.serverTime - Date.now();
-  if (m.type === 'hello') {
-    send({ type: 'connect.request', token: token() });
-  } else if (m.type === 'connect.pending') {
-    phone.state = 'PC 승인 대기';
-    render('PC 화면에서 연결 승인을 눌러 주세요');
-  } else if (m.type === 'connect.rejected') {
-    phone.state = '연결 거부';
-    render(m.message);
-  } else if (m.type === 'link.approved') {
-    phone.linked = true;
-    phone.state = '연결됨';
-    render("연결됐어요. '카메라 켜기'를 누르고 귀와 어깨가 옆에서 보이게 휴대폰을 세워 주세요");
-  } else if (m.type === 'stop.request') {
-    stopCamera();
-    send({ type: 'stop.done', stopId: m.stopId });
-    unlink('종료됨', 'PC 요청으로 촬영을 껐어요');
-  } else if (m.type === 'link.revoked' || m.type === 'link.closed') {
-    unlink('연결 끊김', 'PC와의 연결이 끝나 촬영을 멈췄어요. 다시 쓰려면 PC의 새 QR로 연결해 주세요');
-  } else if (m.type === 'error') {
-    render(m.message);
+async function startCapture(facing) {
+  error = '';
+  message = '카메라와 분석 모델을 준비하고 있어요…';
+  render();
+  stopCapture();
+  try {
+    await camera.start(facing);
+  } catch (err) {
+    camera.stop();
+    message = '';
+    error = cameraErrorMessage(err).replace("'카메라 켜기'", "'측면 촬영 시작'");
+    render();
+    return;
   }
+  // 카메라를 준비하는 사이 종료 요청을 받았거나 연결이 끝났으면 촬영하지 않는다.
+  if (ended || link.status !== 'linked') {
+    stopCapture();
+    render();
+    return;
+  }
+  try {
+    // 휴대폰 화면이 꺼지면 촬영이 멈추므로, 지원하는 브라우저에서는 화면 꺼짐을 막는다.
+    wakeLock = (await navigator.wakeLock?.request('screen')) ?? null;
+  } catch {
+    wakeLock = null;
+  }
+  if (ended || link.status !== 'linked') {
+    stopCapture();
+    render();
+    return;
+  }
+  timer = setInterval(capture, SEND_MS);
+  message = '측면 입력을 PC로 보내고 있어요. 귀와 어깨가 옆모습으로 보이게 휴대폰을 고정해 주세요';
+  render();
 }
 
-function sample() {
-  const now = performance.now();
-  const landmarks = video.readyState >= 2 ? largestPose(phone.pose.detectForVideo(video, now).landmarks) : null;
-  // 더 잘 보이는 쪽의 귀–어깨 각도. 좌표는 보내지 않는다.
-  const s = landmarks ? sideAngle(landmarks, video.videoWidth, video.videoHeight) : null;
-  const valid = Boolean(s && s.ear_vis >= MIN_VISIBILITY && s.shoulder_vis >= MIN_VISIBILITY);
-  phone.seq += 1;
-  send({
-    type: 'side',
-    seq: phone.seq,
-    t: Date.now() + phone.offset,
-    valid,
-    angleDeg: valid ? s.angle_deg : null,
-    earVis: s?.ear_vis ?? 0,
-    shoulderVis: s?.shoulder_vis ?? 0,
-  });
-  $('phone-angle').textContent = valid ? `${s.angle_deg.toFixed(1)}°` : '인식 안 됨';
+function onLinkEvent(type, detail) {
+  if (type === 'stop' || type === 'end') ended = true;
+  if (type === 'stop') {
+    // 실제로 카메라를 끈 뒤에만 종료 확인을 보낸다.
+    stopCapture();
+    link.confirmStop(detail);
+    message = END_TEXT.stopped;
+  } else if (type === 'end') {
+    stopCapture();
+    message = END_TEXT[detail] ?? END_TEXT.closed;
+  }
+  render();
 }
 
 $('phone-request').onclick = () => {
-  const ws = new WebSocket(relayUrl('phone'));
-  phone.ws = ws;
-  phone.state = '연결 중';
-  ws.onmessage = (event) => receive(JSON.parse(event.data));
-  ws.onclose = () => {
-    if (phone.ws !== ws) return;
-    clearInterval(phone.pinger);
-    phone.ws = null;
-    if (phone.state === '종료됨') render();
-    else unlink('연결 끊김', '서버와 연결이 끊겨 촬영을 멈췄어요');
-  };
-  phone.pinger = setInterval(() => {
-    send({ type: 'ping' });
-    // PC·서버에서 아무 응답이 없으면 휴대폰이 스스로 촬영을 멈춘다(파일럿 시간).
-    if (phone.timer && Date.now() - phone.lastServerAt > CONNECTION_PILOT.phoneStopSeconds * 1000) {
-      unlink('연결 끊김', '응답이 없어 촬영을 스스로 멈췄어요');
-    }
-  }, CONNECTION_PILOT.heartbeatSeconds * 1000);
-  render('연결 서버에 접속하고 있어요…');
+  error = '';
+  link.requestConnect(token);
+  render();
 };
+$('phone-camera').onclick = () => startCapture(camera.facing);
+$('phone-flip').onclick = () => startCapture(camera.facing === 'user' ? 'environment' : 'user');
 
-$('phone-camera').onclick = async () => {
-  $('phone-camera').disabled = true;
-  try {
-    phone.pose ??= await createPose();
-    await startCamera(video, 'environment');
-    phone.timer = setInterval(sample, SEND_EVERY_MS);
-    render('옆모습의 각도와 인식 품질을 PC로 보내고 있어요');
-  } catch (error) {
-    stopCamera();
-    render(`카메라를 쓸 수 없어요. 권한을 허용한 뒤 다시 눌러 주세요. (${error?.message ?? error})`);
-  }
-};
+function render() {
+  const status = link?.status ?? 'idle';
+  const capturing = Boolean(camera?.on);
+  $('phone-state').textContent = STATE_LABELS[status];
+  $('phone-capture').textContent = capturing ? '켜짐' : '꺼짐';
+  $('phone-angle').textContent = last?.valid ? `${last.angleDeg.toFixed(1)}°` : (capturing ? '귀·어깨를 찾는 중' : '-');
+  const done = ['linked', 'stopped', 'revoked'].includes(status);
+  show($('phone-request'), !done);
+  $('phone-request').disabled = status !== 'ready';
+  show($('phone-camera'), status === 'linked' && !capturing && !timer && !ended);
+  show($('phone-flip'), status === 'linked' && capturing);
+  show($('phone-preview'), capturing);
+  $('phone-msg').textContent = message || STATUS_TEXT[status] || '';
+  const shown = error || (status === 'rejected' ? link.notice : '');
+  $('phone-error').textContent = shown;
+  show($('phone-error'), Boolean(shown));
+}
 
 onView('/phone', () => {
-  render(token() ? "PC 화면의 QR로 열었어요. '연결 요청'을 눌러 주세요" : 'PC 화면의 딥 모드 QR로 열어 주세요');
+  if (link) {
+    render();
+    return;
+  }
+  camera = new SideCamera($('phone-video'), $('phone-preview'));
+  token = new URLSearchParams(location.search).get('token');
+  if (!token || !TOKEN_PATTERN.test(token)) {
+    error = ERRORS.invalid_token;
+    render();
+    return;
+  }
+  link = new PhoneLink();
+  link.on((type, detail) => {
+    if (type === 'change') render();
+    else onLinkEvent(type, detail);
+  });
+  openLink();
 });
+
+/** 분석 모델을 먼저 불러온 뒤 연결 서버에 붙는다. 승인 뒤 모델 로딩으로 heartbeat가 끊겨 연결이 해제되지 않게 한다. */
+async function openLink() {
+  message = '분석 모델을 준비하고 있어요…';
+  render();
+  try {
+    await camera.prepare();
+  } catch (err) {
+    console.error(err);
+    message = '';
+    error = `분석 모델을 불러오지 못했어요. 페이지를 새로고침해 주세요. (${err?.message ?? err})`;
+    render();
+    return;
+  }
+  message = '';
+  link.open();
+  render();
+}

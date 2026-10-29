@@ -57,8 +57,15 @@ describe('BaselineCollector (F1)', () => {
     expect(r.baseline.head_forward).toBeCloseTo(0.33);
   });
 
-  it('짧게(2초 이하) 가려지면 멈췄다가 이어서 센다 — 끊긴 시간은 넣지 않는다', () => {
+  it('한 프레임만 가려져도 처음부터 다시 모은다', () => {
     const c = new BaselineCollector();
+    for (let t = 0; t <= 3000; t += 500) c.push(t, s(0.33, 0.75, 1));
+    expect(c.push(3500, null).status).toBe('restarted');
+    expect(c.restarts).toBe(1);
+  });
+
+  it('파일럿 유예: 짧게(2초 이하) 가려지면 멈췄다가 이어서 센다 — 끊긴 시간은 넣지 않는다', () => {
+    const c = new BaselineCollector({ graceSeconds: 2 });
     for (let t = 0; t <= 3000; t += 500) c.push(t, s(0.33, 0.75, 1));
     expect(c.push(3500, null).status).toBe('paused');
     expect(c.push(4500, null).status).toBe('paused');
@@ -70,8 +77,8 @@ describe('BaselineCollector (F1)', () => {
     expect(c.restarts).toBe(0);
   });
 
-  it('2초보다 길게 인식이 끊기면 처음부터 다시 모은다', () => {
-    const c = new BaselineCollector();
+  it('파일럿 유예: 2초보다 길게 인식이 끊기면 처음부터 다시 모은다', () => {
+    const c = new BaselineCollector({ graceSeconds: 2 });
     for (let t = 0; t <= 3000; t += 500) c.push(t, s(0.33, 0.75, 1));
     expect(c.push(3500, null).status).toBe('paused');
     expect(c.push(5600, null).status).toBe('restarted');
@@ -101,6 +108,21 @@ describe('validateSettings (F5)', () => {
     const r = validateSettings({ warningSeconds: value, rewarningSeconds: '60' });
     expect(r.ok).toBe(false);
     expect(r.errors).toEqual({ warningSeconds: '양의 정수를 입력해 주세요' });
+  });
+
+  it.each([
+    ['안전한 정수 범위를 넘는 값', '9007199254740992'],
+    ['밀리초로 바꾸면 안전한 정수 범위를 넘는 값', '9007199254741'],
+    ['Infinity로 바뀌는 400자리 값', '9'.repeat(400)],
+  ])('%s는 저장하지 않는다', (_, value) => {
+    const r = validateSettings({ warningSeconds: '10', rewarningSeconds: value });
+    expect(r).toEqual({ ok: false, errors: { rewarningSeconds: '양의 정수를 입력해 주세요' } });
+  });
+
+  it('밀리초로 바꿔도 안전한 정수 범위 안이면 통과한다', () => {
+    const r = validateSettings({ warningSeconds: '10', rewarningSeconds: '9007199254740' });
+    expect(r.ok).toBe(true);
+    expect(Number.isSafeInteger(r.settings.rewarningSeconds * 1000)).toBe(true);
   });
 
   it('같은 값 재적용은 바뀐 설정이 아니다 (S8: 0 거부 뒤 기존과 같은 10초)', () => {

@@ -20,10 +20,38 @@ export const RECOGNITION_LABELS = {
   valid: '유효',
   away: '자리 비움 · 판정 보류',
   unrecognized: '인식 불가 · 판정 보류',
+  side_stale: '측면 입력 지연 · 판정 보류',
+  side_unrecognized: '측면 인식 불가 · 판정 보류',
 };
 
+// 딥 모드 휴대폰 촬영 종료: 요청과 실제 종료 확인을 구분한다 (docs/prd.md 6절 6).
+export const PHONE_STOP_LABELS = {
+  requested: '종료 요청 · 확인 대기',
+  confirmed: '촬영 종료 확인됨',
+  unconfirmed: '종료 요청·확인 안 됨',
+};
+
+const PHONE_STOP_REASONS = {
+  timeout: '10초 안에 응답 없음',
+  phone_closed: '휴대폰 연결 끊김',
+  phone_timeout: '휴대폰 응답 끊김',
+  pc_closed: '연결 서버 끊김',
+  not_linked: '연결 없음',
+};
+
+/**
+ * 휴대폰 촬영 종료 기록을 화면 문구로. 딥 모드를 쓰지 않은 세션은 null이다.
+ * 평가 빌드의 측면 모의 입력이 보낸 응답은 실제 휴대폰 종료 확인과 구분해 표시한다.
+ */
+export function phoneStopText(phoneStop, testMarks = []) {
+  if (!phoneStop) return null;
+  const reason = PHONE_STOP_REASONS[phoneStop.reason];
+  const text = reason ? `${PHONE_STOP_LABELS[phoneStop.status]} (${reason})` : PHONE_STOP_LABELS[phoneStop.status];
+  return testMarks.includes('측면 모의 입력') ? `${text} · 측면 모의 응답` : text;
+}
+
 export class SessionEngine {
-  constructor({ id, startedAt, mode = 'basic', baselineId, settingsVersionId, settings, policy = POLICY }) {
+  constructor({ id, startedAt, mode = 'basic', baselineId, settingsVersionId, settings, policy = POLICY, conditions = null }) {
     this.id = id;
     this.startedAt = startedAt;
     this.policy = policy;
@@ -51,6 +79,9 @@ export class SessionEngine {
     this.reportAccel = null;
     this.endedAt = null;
     this.endReason = null;
+    this.phoneStop = null;
+    // 기록 비교 조건(지표·배치). compare.js의 sessionConditions로 만든다.
+    this.conditions = conditions;
     this.seq = 0;
     this.outbox = [];
   }
@@ -78,7 +109,7 @@ export class SessionEngine {
     if (quality !== 'valid') {
       // 짧은 가림(유예 시간 이하)은 판정·유효 시간만 멈추고 연속 타이머는 그대로 둔다.
       this.invalidSince ??= t;
-      if (t - this.invalidSince <= this.graceMs) return this.#drain();
+      if (this.graceMs > 0 && t - this.invalidSince <= this.graceMs) return this.#drain();
       // 그보다 길면 판정 보류: 후보는 버리고 확정 이탈은 그 사유로 닫는다. 확정 이탈 유무와 별개로 보류 구간을 남긴다.
       if (this.openHold?.reason !== quality) {
         const startAt = this.openHold ? t : this.invalidSince;
@@ -258,14 +289,20 @@ export class SessionEngine {
     return this.#drain();
   }
 
-  /** 딥 모드 연결 장애: 판정·유효 시간을 멈추고 복구 대기 */
+  /** 딥 모드 연결 장애: 판정·유효 시간을 멈추고 복구 대기. 일시 정지·재등록 중에 끊겨도 같은 복구 대기로 간다. */
   enterRecovery(t) {
-    if (this.state === 'running') {
+    if (this.state !== 'ended' && this.state !== 'recovering') {
       this.#stop('disconnected', t);
       this.state = 'recovering';
       this.recognition = 'none';
+      this.lastT = null;
     }
     return this.#drain();
+  }
+
+  /** 휴대폰 촬영 종료 요청·확인 결과(status: requested|confirmed|unconfirmed). 확인 없이 완료로 남기지 않는다. */
+  setPhoneStop(t, status, reason = null) {
+    this.phoneStop = { status, reason, at: t };
   }
 
   /** 평가 빌드의 '[테스트용] 리포트 3초 가속': 첫 자동 주기만 바꾼다. 등록·경고·복귀·재경고 시간은 그대로다. */
@@ -284,7 +321,11 @@ export class SessionEngine {
   end(t, reason = 'user') {
     if (this.state === 'ended') return this.#drain();
     this.#stop('ended', t);
-    if (this.validMs > this.windowStart) {
+    // 자동 리포트 경계([start, end))에 정확히 걸린 경고·보류는 다음 구간 몫이다. 바로 종료하면 길이 0인
+    // 종료 리포트로라도 남겨 원장과 리포트 집계가 어긋나지 않게 한다.
+    const pendingAtBoundary = this.warnings.some((w) => w.valid >= this.windowStart)
+      || this.holds.some((h) => h.validAt >= this.windowStart);
+    if (this.validMs > this.windowStart || (this.reports.length > 0 && pendingAtBoundary)) {
       this.#createReport('final', t, this.windowStart, this.validMs);
     } else if (this.validMs === 0 && this.reports.length === 0) {
       this.#createReport('empty', t, 0, 0);

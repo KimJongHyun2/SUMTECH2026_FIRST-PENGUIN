@@ -6,7 +6,7 @@
  *   events: 확정 이탈 [{ id, onsetValid, endValid|null, endReason, types }]
  *   warnings: [{ eventId, kind: 'first'|'rewarning', valid }]
  *   candidate: 아직 확정되지 않은 후보 { onsetValid } | null
- *   holds: 판정 보류 구간 [{ reason: 'away'|'unrecognized', startAt, validAt }] (확정 이탈 유무와 별개)
+ *   holds: 판정 보류 구간 [{ reason: 'away'|'unrecognized'|'side_stale'|'side_unrecognized', startAt, validAt }] (확정 이탈 유무와 별개)
  * @param start 구간 시작(포함), end 구간 끝(제외). includeEnd면 끝 시점의 보류도 포함(종료 리포트)
  */
 export function windowMetrics({ events, warnings, candidate, validNow, holds = [], segments = [] }, start, end, { includeEnd = false } = {}) {
@@ -34,9 +34,11 @@ export function windowMetrics({ events, warnings, candidate, validNow, holds = [
     }
   }
 
-  const inWindow = warnings.filter((w) => w.valid >= start && w.valid < end);
+  // 자동 리포트는 [start, end), 종료 리포트는 끝 시점에 생긴 경고·보류까지 포함한다.
+  const inRange = (v) => v >= start && (v < end || (includeEnd && v === end));
+  const inWindow = warnings.filter((w) => inRange(w.valid));
   const windowHolds = holds
-    .filter((h) => h.validAt >= start && (h.validAt < end || (includeEnd && h.validAt === end)))
+    .filter((h) => inRange(h.validAt))
     .map((h) => ({ reason: h.reason, startAt: h.startAt }));
   return {
     validSeconds: validMs / 1000,
@@ -83,12 +85,16 @@ function modeMetrics(events, segments, start, validEnd, validNow) {
 export const HOLD_REASON_LABELS = {
   away: '자리 비움 · 판정 보류',
   unrecognized: '인식 불가 · 판정 보류',
+  side_stale: '측면 입력 지연 · 판정 보류',
+  side_unrecognized: '측면 인식 불가 · 판정 보류',
 };
 
 export const END_REASON_LABELS = {
   normal_return: '정상 복귀',
   away: '자리 비움으로 중단',
   unrecognized: '인식 불가로 중단',
+  side_stale: '측면 입력 지연으로 중단',
+  side_unrecognized: '측면 인식 불가로 중단',
   paused: '일시 정지로 중단',
   settings_change: '설정 변경으로 중단',
   baseline_change: '기준 변경으로 중단',

@@ -1,0 +1,35 @@
+@import "tailwindcss";
+@theme {
+  --font-sans: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
+  --color-primary: #b9f23a;
+  --color-primary-strong: #8ed11f;
+  --color-primary-tint: #f0fbdc;
+  --color-ink: #16191b;
+  --color-muted: #6b7378;
+  --color-line: #e5e8e6;
+  --color-surface: #f1f3f2;
+  --color-night: #171b1d;
+  --color-night-card: #252b2e;
+  --color-warning: #f59e2b;
+}
+@layer base {
+  body {
+    @apply m-0 bg-white font-sans text-ink antialiased;
+  }
+  button,
+  a,
+  input {
+    -webkit-tap-highlight-color: transparent;
+  }
+  button:not(:disabled),
+  a {
+    cursor: pointer;
+  }
+  :focus-visible {
+    outline: 3px solid #72a414;
+    outline-offset: 4px;
+  }
+  dialog::backdrop {
+    background: #101719b0;
+  }
+}

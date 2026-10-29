@@ -1,23 +1,28 @@
-// /watch 감지 화면: 진행·경고·복귀(F2), 일시 정지·재개·종료(F3), 판정 보류(F4), 설정(F5), 기준 재등록(F1)
-import { evaluateDeep } from '../../core/deep.js';
+// /watch 감지 화면: 진행·경고·복귀(F2), 일시 정지·재개·종료(F3), 판정 보류(F4), 설정(F5), 기준 재등록(F1),
+// 딥 모드 통합 판정·장애 복구·기본 모드 전환·휴대폰 촬영 종료 확인(F10)
+import { sessionConditions } from '../../core/compare.js';
+import { fuseDeep } from '../../core/deep.js';
 import { evaluateFrame } from '../../core/detector.js';
-import { RECOGNITION_LABELS, SESSION_STATE_LABELS, SessionEngine } from '../../core/engine.js';
+import { RECOGNITION_LABELS, SESSION_STATE_LABELS, SessionEngine, phoneStopText } from '../../core/engine.js';
 import { DEFAULT_SETTINGS, SENSITIVITY, WARNING_TEXT, sameSettings, validateSettings, withDefaults } from '../../core/policy.js';
-import { app, camera, link, navigate, newId, onLive, onView, placeCamera, recorded, saveSession } from '../ctx.js';
-import { $, clock, dateTime, show } from '../format.js';
+import { app, camera, navigate, newId, onLive, onView, placeCamera, recorded, saveSession, sideInput } from '../ctx.js';
+import { LINK_STATUS_LABELS, SIDE_QUALITY_LABELS } from '../deep-link.js';
+import { $, clock, dateTime, show, warningTitle } from '../format.js';
 import { beep } from '../sound.js';
 import { beginRegistration, turnOnCamera } from './setup.js';
-
-// 휴대폰 촬영 종료 요청·확인 표시 (확인 응답이 없으면 완료로 쓰지 않는다)
-const PHONE_STOP_LABELS = {
-  requested: '종료 요청 중…',
-  confirmed: '종료 요청·확인됨',
-  unconfirmed: '종료 요청·확인 안 됨',
-};
 
 const SAVE_EVERY_MS = 5000;
 const PLACEMENT_OK_MS = 1000;
 const MODE_LABELS = { basic: '기본', deep: '딥' };
+const RECOVERY_TEXT = "휴대폰 연결이 끊겨 판정을 멈췄어요(복구 대기). 정면 카메라만으로 이어 가려면 '기본 모드로 계속'을 눌러 주세요. 정면 입력이 유효하지 않으면 누를 수 없어요";
+
+const usedDeep = (session) => session.segments.some((seg) => seg.mode === 'deep');
+
+// 다른 화면을 보는 동안 경고가 전달되는 범위를 있는 그대로 알린다.
+const DELIVERY_TEXT = {
+  soundOn: '다른 탭·IDE·인강 화면을 보는 동안에도 감지는 계속돼요. 그동안에는 이 화면의 경고 문구 대신 탭 제목(⚠ 자세 확인)과 소리로 알려요.',
+  soundOff: "다른 탭·IDE·인강 화면을 보는 동안에도 감지는 계속돼요. 그동안에는 탭 제목(⚠ 자세 확인)만 바뀌어요. 다른 화면에서도 알아차리려면 '설정'에서 소리를 켜 주세요.",
+};
 
 let reportReady = false;
 let saveStatus = null;
@@ -40,15 +45,15 @@ export async function startSession(now, mode = 'basic') {
     baselineId: app.baseline.id,
     settingsVersionId: version.id,
     settings: version.settings,
+    conditions: sessionConditions({ label: camera.label, ...camera.size }),
   });
   app.session = engine;
-  app.phoneUsed = false;
   reportReady = false;
   saveStatus = null;
   app.replay = null;
   // 평가 모드: 녹화 입력과 미리 누른 리포트 가속을 테스트 기록으로 남긴다 (docs/prd.md 7절).
   if (recorded) engine.markTest('녹화 정면 입력');
-  if (mode === 'deep' && app.simPhone) engine.markTest('측면 모의 입력(테스트 휴대폰)');
+  if (mode === 'deep' && app.mockPhone) engine.markTest('측면 모의 입력');
   if (app.reportAccelPending) {
     engine.accelerateFirstReport(now, app.reportAccelPending);
     app.reportAccelPending = null;
@@ -87,11 +92,41 @@ function handle(signals) {
   }
 }
 
+/** 딥 모드는 정면과 동기화된 측면 입력이 함께 유효해야 시작·재개한다. */
+function inputReady(session, now) {
+  if (app.frame.quality !== 'valid') return false;
+  return session.mode !== 'deep' || sideInput(now).quality === 'valid';
+}
+
+/** 딥 모드 연결이 끊기면 진행·정지·재등록 중 어느 상태든 판정을 멈추고 복구 대기로 간다 (F10). */
+function checkDeepLink(session, now) {
+  if (session.mode !== 'deep' || app.link?.linked) return false;
+  if (session.state === 'ended' || session.state === 'recovering') return false;
+  app.registration = null;
+  app.resuming = false;
+  show($('rebaseline-panel'), false);
+  handle(session.enterRecovery(now));
+  $('watch-msg').textContent = RECOVERY_TEXT;
+  placeCamera();
+  saveSession(now);
+  return true;
+}
+
+/** 종료 때 보낸 휴대폰 촬영 종료 요청의 결과(확인·무응답)를 세션 기록에 옮긴다. */
+function syncPhoneStop(session, now) {
+  const stop = app.link?.stop;
+  if (session.phoneStop?.status !== 'requested' || !stop || stop.status === 'requested') return;
+  session.setPhoneStop(now, stop.status, stop.reason);
+  saveSession(now).then((ok) => { if (!ok) saveStatus = '저장 실패'; });
+}
+
 export function sessionTick(now) {
   const session = app.session;
+  syncPhoneStop(session, now);
+  if (checkDeepLink(session, now)) return;
   if (session.state === 'ready' && app.resuming) {
     // 재개: 기준·배치가 유효한 입력을 확인한 뒤 같은 세션의 새 연속 구간을 시작한다.
-    if (app.frame.quality === 'valid') {
+    if (inputReady(session, now)) {
       app.placementSince ??= now;
       if (now - app.placementSince >= PLACEMENT_OK_MS) {
         app.resuming = false;
@@ -105,21 +140,15 @@ export function sessionTick(now) {
     return;
   }
   if (session.state !== 'running') return;
-  // 딥 모드에서 연결 유실이 확인되면 판정을 멈추고 복구 대기로 바꾼다. 기본 모드 전환은 사용자가 고른다 (F10).
-  if (session.mode === 'deep' && !link.linked) {
-    handle(session.enterRecovery(now));
-    $('watch-msg').textContent = "휴대폰 연결이 끊겼어요. 판정을 멈췄어요. 정면 카메라로 계속하려면 '기본 모드로 계속'을 눌러 주세요";
-    saveSession(now);
-    return;
-  }
   const input = app.frame.quality === 'valid' ? app.frame.smoothed : app.frame.sample;
   const { sensitivity } = withDefaults(session.settings);
-  app.lastEval = evaluateFrame(input, app.baseline?.features, sensitivity);
+  let evaluation = evaluateFrame(input, app.baseline?.features, sensitivity);
   if (session.mode === 'deep') {
-    // 측면 입력이 무효·중단·오래됨이면 정면만으로 판정하지 않고 전체를 보류한다.
-    const side = link.idle ? null : link.side;
-    app.lastEval = evaluateDeep(app.lastEval, side, app.baseline.side, link.serverNow(), sensitivity);
+    // 유효하고 동기화된 두 입력만 결합한다. 한쪽이라도 무효이면 전체 판정을 보류한다.
+    const side = sideInput(now);
+    evaluation = fuseDeep(evaluation, side.quality, side.side, app.baseline?.features?.side_angle_deg, sensitivity);
   }
+  app.lastEval = evaluation;
   handle(session.tick(now, app.lastEval));
   if (now - app.lastSave >= SAVE_EVERY_MS) saveSession(now);
 }
@@ -130,7 +159,9 @@ $('watch-pause').onclick = () => {
   const now = Date.now();
   handle(app.session.pause(now));
   camera.stop();
-  $('watch-msg').textContent = "일시 정지 중이에요. 촬영이 꺼졌어요. '재개'를 누르면 기준·배치를 확인한 뒤 이어서 감지해요";
+  $('watch-msg').textContent = app.session.mode === 'deep'
+    ? "일시 정지 중이에요. PC 카메라가 꺼졌어요. 휴대폰 측면 촬영은 연결 유지를 위해 계속되지만 판정에 쓰지 않아요. '재개'를 누르면 양쪽 기준·배치를 확인한 뒤 이어서 감지해요"
+    : "일시 정지 중이에요. 촬영이 꺼졌어요. '재개'를 누르면 기준·배치를 확인한 뒤 이어서 감지해요";
   placeCamera();
   saveSession(now);
 };
@@ -140,6 +171,7 @@ $('watch-resume').onclick = async () => {
   handle(app.session.prepare(now));
   $('watch-msg').textContent = '카메라를 켜고 있어요…';
   const error = camera.on ? null : await turnOnCamera();
+  if (app.session.state !== 'ready') return;
   if (error) {
     $('watch-msg').textContent = error;
     return;
@@ -216,6 +248,7 @@ $('watch-rebaseline').onclick = () => {
 $('rebaseline-register').onclick = async () => {
   if (!camera.on) {
     const error = await turnOnCamera();
+    if (app.session.state !== 'ready') return;
     if (error) {
       $('rebaseline-msg').textContent = error;
       return;
@@ -223,11 +256,14 @@ $('rebaseline-register').onclick = async () => {
     placeCamera();
   }
   $('rebaseline-resume').disabled = true;
+  const deep = app.session.mode === 'deep';
+  const linkId = app.link?.linkId;
   beginRegistration($('rebaseline-msg'), (record, now) => {
+    if (deep) app.deepBaselineLinkId = linkId;
     handle(app.session.setBaseline(now, record.id));
     $('rebaseline-resume').disabled = false;
     saveSession(now);
-  });
+  }, { deep });
 };
 
 // '탐지 재개'도 누른 뒤 새 기준과 같은 배치의 유효 입력이 확인되면 이어서 시작한다(재개와 같은 확인 흐름).
@@ -250,24 +286,44 @@ $('watch-report').onclick = openReport;
 $('end-report').onclick = openReport;
 $('end-history').onclick = () => navigate('/history');
 
-// 복구 대기에서 사용자가 고르면 같은 세션의 새 기본 구간을 시작한다. 새 이탈은 새 10초를 요구한다 (F10).
-$('watch-basic').onclick = () => {
+// 딥 모드: 같은 세션에 새 기본 구간을 만들고, 정면 기준·배치를 확인한 뒤 이어서 감지한다 (F10).
+// 정면 입력이 유효하지 않으면 버튼을 끈다. 전환 뒤 새 이탈은 새 10초를 요구한다.
+$('watch-basic').onclick = async () => {
+  const session = app.session;
+  if (session?.state !== 'recovering') return;
+  if (!camera.on) {
+    $('watch-msg').textContent = '카메라를 켜고 있어요…';
+    const error = await turnOnCamera();
+    if (session.state !== 'recovering') return;
+    if (error) {
+      $('watch-msg').textContent = error;
+      return;
+    }
+  }
   const now = Date.now();
-  if (app.session.state !== 'recovering' || app.frame.quality !== 'valid') return;
-  handle(app.session.setMode(now, 'basic'));
-  handle(app.session.start(now));
-  $('watch-msg').textContent = '정면 카메라만으로 같은 세션을 기본 모드로 이어서 감지해요';
+  handle(session.setMode(now, 'basic'));
+  handle(session.prepare(now));
+  app.resuming = true;
+  app.placementSince = null;
+  $('watch-msg').textContent = '정면 기준·배치를 확인하고 있어요. 확인되면 같은 세션에서 기본 모드로 이어서 감지해요';
+  placeCamera();
   saveSession(now);
 };
+
+/** 딥 모드를 쓴 세션은 종료 때 휴대폰 촬영 종료를 요청한다. 확인 전에는 완료로 남기지 않는다. */
+function requestPhoneStop(session, now) {
+  if (!usedDeep(session)) return;
+  app.link?.requestStop();
+  const stop = app.link?.stop ?? { status: 'unconfirmed', reason: 'not_linked' };
+  session.setPhoneStop(now, stop.status, stop.reason);
+}
 
 $('watch-end').onclick = async () => {
   const now = Date.now();
   app.registration = null;
   app.resuming = false;
-  // 딥 모드를 썼으면 휴대폰에 촬영 종료를 요청한다. 연결이 이미 끊겼으면 '확인 안 됨'으로 남는다.
-  app.phoneUsed = app.session.segments.some((segment) => segment.mode === 'deep');
-  if (app.phoneUsed) link.requestStop();
   handle(app.session.end(now));
+  requestPhoneStop(app.session, now);
   camera.stop();
   show($('settings-panel'), false);
   show($('rebaseline-panel'), false);
@@ -285,10 +341,19 @@ function postureText(session) {
   if (session.state !== 'running' || !app.lastEval) return '-';
   if (session.recognition !== 'valid') return '판정 보류';
   if (!app.lastEval.deviated) return '기준 범위예요';
-  return app.lastEval.types.includes('head_forward') ? '머리가 기준보다 앞으로 나왔어요' : '기준에서 벗어났어요';
+  const forward = app.lastEval.types.includes('head_forward') || app.lastEval.types.includes('side_angle');
+  return forward ? '머리가 기준보다 앞으로 나왔어요' : '기준에서 벗어났어요';
 }
 
-function renderWatch() {
+function phoneText(session, now) {
+  if (!usedDeep(session)) return '-';
+  if (session.state === 'ended') return phoneStopText(session.phoneStop, session.testMarks) ?? '-';
+  if (session.mode !== 'deep') return '사용 안 함 (기본 모드로 전환)';
+  if (!app.link?.linked) return LINK_STATUS_LABELS[app.link?.status ?? 'idle'];
+  return `연결됨 · 측면 ${SIDE_QUALITY_LABELS[sideInput(now).quality]}`;
+}
+
+function renderWatch(now = Date.now()) {
   if (app.view !== '/watch') return;
   const session = app.session;
   if (!session) {
@@ -301,6 +366,8 @@ function renderWatch() {
   $('watch-session').textContent = session.id;
   $('watch-state').textContent = SESSION_STATE_LABELS[session.state];
   $('watch-mode').textContent = MODE_LABELS[session.mode];
+  $('watch-phone').textContent = phoneText(session, now);
+  $('watch-delivery').textContent = withDefaults(session.settings).sound ? DELIVERY_TEXT.soundOn : DELIVERY_TEXT.soundOff;
   $('watch-baseline').textContent = session.currentSegment.baselineId;
   const applied = withDefaults(session.settings);
   $('watch-settings-version').textContent =
@@ -317,30 +384,21 @@ function renderWatch() {
   const warning = session.warningActive;
   show($('watch-warning'), warning);
   if (warning && !$('watch-warning').textContent) $('watch-warning').textContent = WARNING_TEXT;
-  document.title = warning ? '⚠ 자세 확인 · 패스트거북이' : '패스트거북이';
   show($('watch-report-ready'), reportReady && !ended);
 
   show($('watch-controls'), !ended);
   show($('watch-pause'), session.state === 'running');
   show($('watch-resume'), session.state === 'paused');
   $('watch-rebaseline').disabled = session.state !== 'running' && session.state !== 'paused';
-  // 복구 대기에서만 보이고, 유효한 정면 기준·입력이 있을 때만 누를 수 있다.
   show($('watch-basic'), session.state === 'recovering');
-  $('watch-basic').disabled = app.frame.quality !== 'valid';
+  $('watch-basic').disabled = camera.on && app.frame.quality !== 'valid';
 
   show($('end-panel'), ended);
   if (ended) {
     $('end-camera').textContent = camera.on ? '켜짐' : '꺼짐';
-    $('end-phone').textContent = phoneStopText();
+    $('end-phone').textContent = phoneStopText(session.phoneStop, session.testMarks) ?? '사용 안 함';
     $('end-save').textContent = saveStatus ?? '-';
   }
-}
-
-function phoneStopText() {
-  if (!app.phoneUsed) return '-';
-  const text = PHONE_STOP_LABELS[link.stop.status] ?? '-';
-  // 테스트 휴대폰의 응답은 실제 촬영 종료 확인이 아니다.
-  return link.stop.status === 'confirmed' && app.simPhone ? `${text} (테스트 휴대폰 모의 응답)` : text;
 }
 
 onView('/watch', () => {
@@ -348,3 +406,10 @@ onView('/watch', () => {
   renderWatch();
 });
 onLive(renderWatch);
+
+// 탭 제목은 어느 화면(리포트·기록 등)을 보고 있든, 탭이 가려져 있든 측정 tick마다 맞춘다.
+// 측정 tick은 워커 타이머라 다른 탭·IDE를 보는 동안에도 늦춰지지 않는다.
+onLive((now) => {
+  const warning = Boolean(app.session?.warningActive);
+  document.title = warningTitle({ warning, hidden: document.hidden, now });
+});

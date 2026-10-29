@@ -31,3 +31,12 @@ export function renderFacts(dl, pairs) {
     return row;
   }));
 }
+
+export const APP_TITLE = '패스트거북이';
+const WARNING_TITLES = ['⚠ 자세 확인 · 패스트거북이', '⚠⚠ 자세를 확인해 주세요'];
+
+/** 탭 제목 경고. 다른 탭·IDE를 보는 동안(hidden)에는 1초마다 번갈아 바꿔 탭 줄에서 눈에 띄게 한다. */
+export function warningTitle({ warning, hidden, now }) {
+  if (!warning) return APP_TITLE;
+  return WARNING_TITLES[hidden ? Math.floor(now / 1000) % 2 : 0];
+}
