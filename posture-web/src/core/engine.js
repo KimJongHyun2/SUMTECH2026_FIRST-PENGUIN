@@ -40,10 +40,15 @@ export class SessionEngine {
     this.invalidSince = null;
     this.stops = [];
     this.reports = [];
-    this.windowStartAt = [];
     this.segments = [{ fromValid: 0, at: startedAt, mode, baselineId, settingsVersionId }];
     this.episode = null;
+    // 현재 리포트 구간: [windowStart, nextBoundary) (유효 시간 ms). windowStartedAt은 그 구간의 첫 유효 입력 시각.
+    this.windowStart = 0;
+    this.windowStartedAt = null;
     this.nextBoundary = policy.reportValidSeconds * 1000;
+    // 평가 빌드의 테스트 입력·주기 표시 (docs/prd.md 7절). 운영 기록과 구분해 리포트에 남긴다.
+    this.testMarks = [];
+    this.reportAccel = null;
     this.endedAt = null;
     this.endReason = null;
     this.seq = 0;
@@ -88,14 +93,16 @@ export class SessionEngine {
 
     const prev = this.validMs;
     this.validMs += dt;
-    const windowIndex = Math.floor(prev / this.reportMs);
-    if (this.windowStartAt[windowIndex] === undefined) this.windowStartAt[windowIndex] = t - dt;
+    this.windowStartedAt ??= t - dt;
 
     this.#updateEpisode(t, prev, dt, deviated, types);
     while (this.validMs >= this.nextBoundary) {
-      const index = this.nextBoundary / this.reportMs - 1;
-      this.#createReport(index, 'auto', t);
-      this.nextBoundary += this.reportMs;
+      this.#createReport('auto', t, this.windowStart, this.nextBoundary);
+      this.windowStart = this.nextBoundary;
+      this.windowStartedAt = t;
+      // 테스트 가속은 첫 생성 후 해제하고, 마지막 경계부터 운영 주기(1800초)로 돌아간다.
+      if (this.reportAccel && !this.reportAccel.released) this.reportAccel.released = true;
+      this.nextBoundary = this.windowStart + this.reportMs;
     }
     return this.#drain();
   }
@@ -261,14 +268,26 @@ export class SessionEngine {
     return this.#drain();
   }
 
+  /** 평가 빌드의 '[테스트용] 리포트 3초 가속': 첫 자동 주기만 바꾼다. 등록·경고·복귀·재경고 시간은 그대로다. */
+  accelerateFirstReport(t, seconds) {
+    if (this.state === 'ended' || this.reports.length > 0) return this.#drain();
+    this.reportAccel = { firstSeconds: seconds, appliedAt: t, released: false };
+    this.nextBoundary = this.windowStart + seconds * 1000;
+    this.markTest(`리포트 ${seconds}초 가속(첫 주기)`);
+    return this.#drain();
+  }
+
+  markTest(label) {
+    if (!this.testMarks.includes(label)) this.testMarks.push(label);
+  }
+
   end(t, reason = 'user') {
     if (this.state === 'ended') return this.#drain();
     this.#stop('ended', t);
-    const lastBoundary = this.nextBoundary - this.reportMs;
-    if (this.validMs > lastBoundary) {
-      this.#createReport(lastBoundary / this.reportMs, 'final', t);
+    if (this.validMs > this.windowStart) {
+      this.#createReport('final', t, this.windowStart, this.validMs);
     } else if (this.validMs === 0 && this.reports.length === 0) {
-      this.#createReport(0, 'empty', t);
+      this.#createReport('empty', t, 0, 0);
     }
     this.state = 'ended';
     this.recognition = 'none';
@@ -290,33 +309,34 @@ export class SessionEngine {
       holds: this.openHold ? [...this.holds, this.openHold] : this.holds,
       candidate: this.episode?.status === 'candidate' ? this.episode : null,
       validNow: this.validMs,
+      segments: this.segments,
     };
   }
 
   /** @returns [start, end, options] 자동 리포트는 [시작, 끝), 종료 리포트는 끝 시점의 보류까지 포함 */
   #window(report) {
-    const start = report.index * this.reportMs;
-    const end = report.kind === 'auto' ? start + this.reportMs : this.validMs;
-    return [start, Math.max(end, start), { includeEnd: report.kind !== 'auto' }];
+    return [report.startValid, report.endValid, { includeEnd: report.kind !== 'auto' }];
   }
 
-  #createReport(index, kind, t) {
+  #createReport(kind, t, start, end) {
+    const index = this.reports.filter((r) => r.kind === 'auto').length;
     const report = {
-      id: `${this.id}-w${index}`,
+      id: `${this.id}-w${this.reports.length}`,
       sessionId: this.id,
       index,
       kind,
       revision: 1,
       createdAt: t,
       updatedAt: t,
-      startAt: this.windowStartAt[index] ?? t,
+      startAt: this.windowStartedAt ?? t,
       endAt: t,
       mode: this.mode,
+      startValid: start,
+      endValid: Math.max(end, start),
+      test: [...this.testMarks],
     };
-    const [start, end, options] = this.#window(report);
-    report.startValid = start;
-    report.endValid = end;
-    report.metrics = windowMetrics(this.#ledger(), start, end, options);
+    const [, , options] = this.#window(report);
+    report.metrics = windowMetrics(this.#ledger(), report.startValid, report.endValid, options);
     this.reports.push(report);
     this.outbox.push({ type: 'report', reportId: report.id, kind });
   }
@@ -337,8 +357,7 @@ export class SessionEngine {
 
   /** 진행 중 화면 표시용: 아직 리포트로 닫히지 않은 현재 구간 */
   currentWindowMetrics() {
-    const start = (this.nextBoundary - this.reportMs);
-    return windowMetrics(this.#ledger(), start, this.validMs);
+    return windowMetrics(this.#ledger(), this.windowStart, this.validMs);
   }
 
   // ------------------------------------------------------------ 저장·복원
@@ -365,6 +384,10 @@ export class SessionEngine {
   static fromJSON(data, policy = POLICY) {
     const engine = new SessionEngine({ id: data.id, startedAt: data.startedAt, settings: data.settings, policy });
     Object.assign(engine, data);
+    // 구간 시작을 따로 저장하기 전의 기록: 운영 주기만 있었으므로 마지막 경계에서 계산한다.
+    engine.windowStart ??= data.nextBoundary - policy.reportValidSeconds * 1000;
+    engine.windowStartedAt ??= null;
+    engine.testMarks ??= [];
     engine.policy = policy;
     engine.outbox = [];
     if (data.episode) engine.episode = { ...data.episode, types: new Set(data.episode.types) };

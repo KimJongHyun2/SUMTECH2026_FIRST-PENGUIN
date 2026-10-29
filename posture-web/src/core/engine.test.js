@@ -208,6 +208,49 @@ describe('리포트 (F6, docs/prd.md 4절)', () => {
     expect(engine.reports.map((x) => [x.kind, x.metrics.validSeconds])).toEqual([['auto', 1800], ['final', 5]]);
   });
 
+  it('운영 경계: 유효 1799.5초에는 자동 리포트가 없고 1800초에 생긴다', () => {
+    const engine = newEngine();
+    let r = feed(engine, 0, 1799.5, GOOD);
+    expect(engine.reports).toHaveLength(0);
+    r = feed(engine, r.t, 0.5, GOOD);
+    expect(engine.reports.map((x) => x.kind)).toEqual(['auto']);
+  });
+
+  it('S3 테스트 가속: 첫 주기만 유효 3초, 이후 경계부터 1800초로 복원하고 테스트 표시를 남긴다', () => {
+    const engine = newEngine();
+    engine.accelerateFirstReport(0, 3);
+    let r = feed(engine, 0, 2.5, GOOD);
+    expect(engine.reports).toHaveLength(0);
+    r = feed(engine, r.t, 0.5, GOOD);
+    expect(types(r.signals)).toEqual(['report']);
+    const [first] = engine.reports;
+    expect(first).toMatchObject({ kind: 'auto', startValid: 0, endValid: 3000, test: ['리포트 3초 가속(첫 주기)'] });
+    expect(first.metrics).toMatchObject({ validSeconds: 3, deviationSeconds: 0, ratio: 0, newEvents: 0 });
+    expect(engine.reportAccel.released).toBe(true);
+    expect(engine.nextBoundary).toBe(3000 + 1800 * 1000);
+    expect(engine.state).toBe('running');
+    // 등록·경고 시간은 바뀌지 않는다: 이탈 10초에 경고
+    r = feed(engine, r.t, 9.5, BAD);
+    expect(engine.warnings).toHaveLength(0);
+    feed(engine, r.t, 0.5, BAD);
+    expect(engine.warnings).toHaveLength(1);
+  });
+
+  it('모드별 V·D를 나눈다 (S6: 딥 → 기본 전환)', () => {
+    const engine = newEngine();
+    engine.setMode(0, 'deep');
+    let r = feed(engine, 0, 2, GOOD);
+    engine.enterRecovery(r.t);
+    engine.setMode(r.t, 'basic');
+    engine.start(r.t);
+    r = feed(engine, r.t, 3, GOOD);
+    engine.end(r.t);
+    expect(engine.reports[0].metrics.modes).toEqual({
+      deep: { validSeconds: 2, deviationSeconds: 0, ratio: 0 },
+      basic: { validSeconds: 3, deviationSeconds: 0, ratio: 0 },
+    });
+  });
+
   it('C06 정확한 1800초 경계에서 종료하면 자동 리포트 하나만 남는다', () => {
     const engine = newEngine();
     const r = feed(engine, 0, 1800, GOOD);
