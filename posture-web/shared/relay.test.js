@@ -354,6 +354,23 @@ describe('촬영 종료 요청·확인', () => {
     expect(all(pc, 'stop.confirmed')).toHaveLength(0);
   });
 
+  it('종료 확인 전에 휴대폰 연결이 끊기면 확인 안 됨으로 알린다 (끊김은 카메라 종료가 아니다)', () => {
+    const { pc, phone } = linkPair();
+    send(pc, { type: 'stop.request' });
+    const { stopId } = last(phone, 'stop.request');
+    hub.disconnect(phone, 'closed');
+    expect(last(pc, 'stop.unconfirmed')).toEqual({ type: 'stop.unconfirmed', stopId, reason: 'phone_closed' });
+    expect(all(pc, 'stop.confirmed')).toHaveLength(0);
+    expect(last(pc, 'link.lost').reason).toBe('phone_closed');
+  });
+
+  it('PC가 연결을 무효화해도 휴대폰에는 종료 요청이 아니라 무효화로만 알린다', () => {
+    const { pc, phone } = linkPair();
+    hub.disconnect(pc, 'closed');
+    expect(last(phone, 'link.revoked').reason).toBe('pc_closed');
+    expect(all(phone, 'stop.request')).toHaveLength(0);
+  });
+
   it('틀린 종료 ID는 확인으로 보지 않는다', () => {
     const { pc, phone } = linkPair();
     send(pc, { type: 'stop.request' });
