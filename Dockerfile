@@ -8,6 +8,9 @@ COPY posture-web/ ./
 # 배포 사이트(Vercel) 빌드에는 넣지 않는다.
 ARG EVAL_ENABLED=false
 ENV EVAL_ENABLED=$EVAL_ENABLED
+# 산출물의 health.json도 실제 빌드 버전을 쓰도록 빌드 단계에도 넘긴다(실행 중 /__health는 server.js가 응답).
+ARG RELEASE_ID=dev
+ENV RELEASE_ID=$RELEASE_ID
 COPY e2e/fixtures/test-pose.webm e2e/fixtures/test-pose.manifest.json /e2e/fixtures/
 RUN npm run build
 
