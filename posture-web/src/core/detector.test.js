@@ -57,14 +57,28 @@ describe('BaselineCollector (F1)', () => {
     expect(r.baseline.head_forward).toBeCloseTo(0.33);
   });
 
-  it('중간에 인식이 끊기면 처음부터 다시 모은다', () => {
+  it('짧게(2초 이하) 가려지면 멈췄다가 이어서 센다 — 끊긴 시간은 넣지 않는다', () => {
     const c = new BaselineCollector();
     for (let t = 0; t <= 3000; t += 500) c.push(t, s(0.33, 0.75, 1));
-    expect(c.push(3500, null).status).toBe('restarted');
+    expect(c.push(3500, null).status).toBe('paused');
+    expect(c.push(4500, null).status).toBe('paused');
     let r;
-    for (let t = 4000; t <= 8500; t += 500) r = c.push(t, s(0.33, 0.75, 1));
+    for (let t = 5000; t <= 6500; t += 500) r = c.push(t, s(0.33, 0.75, 1));
     expect(r.status).toBe('collecting');
-    r = c.push(9000, s(0.33, 0.75, 1));
+    r = c.push(7000, s(0.33, 0.75, 1));
+    expect(r.status).toBe('done');
+    expect(c.restarts).toBe(0);
+  });
+
+  it('2초보다 길게 인식이 끊기면 처음부터 다시 모은다', () => {
+    const c = new BaselineCollector();
+    for (let t = 0; t <= 3000; t += 500) c.push(t, s(0.33, 0.75, 1));
+    expect(c.push(3500, null).status).toBe('paused');
+    expect(c.push(5600, null).status).toBe('restarted');
+    let r;
+    for (let t = 6000; t <= 10500; t += 500) r = c.push(t, s(0.33, 0.75, 1));
+    expect(r.status).toBe('collecting');
+    r = c.push(11000, s(0.33, 0.75, 1));
     expect(r.status).toBe('done');
     expect(c.restarts).toBe(1);
   });
