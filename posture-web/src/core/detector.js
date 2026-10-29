@@ -1,12 +1,10 @@
 // 한 프레임의 입력 품질과 기준 대비 이탈을 판정한다.
-// 경계값은 p1 T1 데이터에서 잡은 파일럿 값이다(거북목_약 Δ목길이 −0.041, 고개숙임 Δpitch +31°).
-// 민감도 배율도 파일럿 값이며 실측으로 다시 정한다(docs/planning-policy.yaml threshold).
+// 경계값은 p1 T1 데이터에서 잡은 파일럿 값이며 실측으로 다시 정한다(docs/planning-policy.yaml threshold).
 import { POLICY } from './policy.js';
 
 export const MODEL_VERSION = 'pose_landmarker_lite/float16/1+face_landmarker/float16/1';
 
-const BASE_LIMITS = { headForward: 0.025, neckLen: 0.035, pitch: 20 };
-const SENSITIVITY_SCALE = { low: 1.5, normal: 1, high: 0.7 };
+export const LIMITS = Object.freeze({ headForward: 0.025, neckLen: 0.035, pitch: 20 });
 const MIN_VISIBILITY = 0.5;
 
 export const SIGNAL_KEYS = ['head_forward', 'neck_len', 'pitch_deg'];
@@ -16,11 +14,6 @@ export function frameQuality(sample) {
   if (!sample) return 'away';
   if (!(sample.ear_vis >= MIN_VISIBILITY) || !(sample.shoulder_vis >= MIN_VISIBILITY)) return 'unrecognized';
   return 'valid';
-}
-
-export function limitsFor(sensitivity = 'normal') {
-  const k = SENSITIVITY_SCALE[sensitivity] ?? 1;
-  return { headForward: BASE_LIMITS.headForward * k, neckLen: BASE_LIMITS.neckLen * k, pitch: BASE_LIMITS.pitch * k };
 }
 
 /** 여러 프레임 평균 (순간 흔들림 완화). pitch는 잡힌 프레임만 평균 낸다. */
@@ -36,15 +29,14 @@ export function averageSamples(samples) {
 }
 
 /** 기준 대비 이탈 여부와 유형. 유형은 기록용이며 사용자에게는 공통 경고만 보인다. */
-export function evaluateFrame(sample, baseline, sensitivity = 'normal') {
+export function evaluateFrame(sample, baseline) {
   const quality = frameQuality(sample);
   if (quality !== 'valid' || !baseline) return { quality, deviated: false, types: [] };
-  const limits = limitsFor(sensitivity);
   const types = [];
-  if (sample.head_forward - baseline.head_forward >= limits.headForward) types.push('head_forward');
-  if (sample.neck_len - baseline.neck_len <= -limits.neckLen) types.push('neck_len');
+  if (sample.head_forward - baseline.head_forward >= LIMITS.headForward) types.push('head_forward');
+  if (sample.neck_len - baseline.neck_len <= -LIMITS.neckLen) types.push('neck_len');
   if (typeof sample.pitch_deg === 'number' && typeof baseline.pitch_deg === 'number'
-    && sample.pitch_deg - baseline.pitch_deg >= limits.pitch) types.push('pitch');
+    && sample.pitch_deg - baseline.pitch_deg >= LIMITS.pitch) types.push('pitch');
   return { quality, deviated: types.length > 0, types };
 }
 
@@ -83,10 +75,9 @@ export class BaselineCollector {
   #unstable(sample) {
     if (!this.samples.length) return false;
     const mean = averageSamples(this.samples);
-    const limits = limitsFor('normal');
-    return Math.abs(sample.head_forward - mean.head_forward) >= limits.headForward
-      || Math.abs(sample.neck_len - mean.neck_len) >= limits.neckLen
+    return Math.abs(sample.head_forward - mean.head_forward) >= LIMITS.headForward
+      || Math.abs(sample.neck_len - mean.neck_len) >= LIMITS.neckLen
       || (typeof sample.pitch_deg === 'number' && typeof mean.pitch_deg === 'number'
-        && Math.abs(sample.pitch_deg - mean.pitch_deg) >= limits.pitch / 2);
+        && Math.abs(sample.pitch_deg - mean.pitch_deg) >= LIMITS.pitch / 2);
   }
 }

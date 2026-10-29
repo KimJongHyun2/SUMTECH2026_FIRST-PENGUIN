@@ -6,9 +6,10 @@
  *   events: 확정 이탈 [{ id, onsetValid, endValid|null, endReason, types }]
  *   warnings: [{ eventId, kind: 'first'|'rewarning', valid }]
  *   candidate: 아직 확정되지 않은 후보 { onsetValid } | null
- * @param start 구간 시작(포함), end 구간 끝(제외)
+ *   holds: 판정 보류 구간 [{ reason: 'away'|'unrecognized', startAt, validAt }] (확정 이탈 유무와 별개)
+ * @param start 구간 시작(포함), end 구간 끝(제외). includeEnd면 끝 시점의 보류도 포함(종료 리포트)
  */
-export function windowMetrics({ events, warnings, candidate, validNow }, start, end) {
+export function windowMetrics({ events, warnings, candidate, validNow, holds = [] }, start, end, { includeEnd = false } = {}) {
   const validEnd = Math.min(end, validNow);
   const validMs = Math.max(0, validEnd - start);
   let deviationMs = 0;
@@ -34,6 +35,9 @@ export function windowMetrics({ events, warnings, candidate, validNow }, start, 
   }
 
   const inWindow = warnings.filter((w) => w.valid >= start && w.valid < end);
+  const windowHolds = holds
+    .filter((h) => h.validAt >= start && (h.validAt < end || (includeEnd && h.validAt === end)))
+    .map((h) => ({ reason: h.reason, startAt: h.startAt }));
   return {
     validSeconds: validMs / 1000,
     deviationSeconds: deviationMs / 1000,
@@ -45,9 +49,15 @@ export function windowMetrics({ events, warnings, candidate, validNow }, start, 
     normalReturns,
     interruptions,
     provisional: Boolean(candidate && candidate.onsetValid < end && candidate.onsetValid >= start),
+    holds: windowHolds,
     events: items,
   };
 }
+
+export const HOLD_REASON_LABELS = {
+  away: '자리 비움 · 판정 보류',
+  unrecognized: '인식 불가 · 판정 보류',
+};
 
 export const END_REASON_LABELS = {
   normal_return: '정상 복귀',

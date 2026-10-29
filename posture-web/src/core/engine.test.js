@@ -78,6 +78,23 @@ describe('경고·복귀 (F2)', () => {
     expect(engine.reports[0].metrics).toMatchObject({ normalReturns: 0, interruptions: 1, validSeconds: 15 });
   });
 
+  it('S4: 이탈 6초 → 자리 비움 5초 → 새 이탈 4초는 경고 0회, 새 연속 10초에 최초 경고 1회', () => {
+    const engine = newEngine();
+    let r = feed(engine, 0, 6, BAD);
+    r = feed(engine, r.t, 5, AWAY);
+    expect(engine.recognition).toBe('away');
+    expect(engine.validMs).toBe(6000);
+    r = feed(engine, r.t, 4, BAD);
+    expect(types(r.signals)).toEqual([]);
+    r = feed(engine, r.t, 6, BAD);
+    expect(types(r.signals)).toEqual(['warning']);
+    r = feed(engine, r.t, 3, GOOD);
+    engine.end(r.t);
+    const m = engine.reports[0].metrics;
+    expect(m).toMatchObject({ newEvents: 1, firstWarnings: 1, rewarnings: 0, normalReturns: 1, interruptions: 0, validSeconds: 19 });
+    expect(m.holds.map((h) => h.reason)).toEqual(['away']);
+  });
+
   it('잠깐(3초 미만) 바르게 앉았다 다시 이탈하면 같은 이벤트가 이어진다', () => {
     const engine = newEngine();
     let r = feed(engine, 0, 12, BAD);

@@ -25,12 +25,6 @@ describe('evaluateFrame (p1 T1 평균 변화량)', () => {
     expect(evaluateFrame(sample, base).deviated).toBe(deviated);
   });
 
-  it('민감도가 낮으면 같은 변화도 이탈로 보지 않을 수 있다', () => {
-    const weak = s(0.33, 0.709, 0);
-    expect(evaluateFrame(weak, base, 'normal').deviated).toBe(true);
-    expect(evaluateFrame(weak, base, 'low').deviated).toBe(false);
-  });
-
   it('유효하지 않은 입력은 판정하지 않는다', () => {
     expect(evaluateFrame(null, base)).toEqual({ quality: 'away', deviated: false, types: [] });
   });
@@ -65,20 +59,16 @@ describe('BaselineCollector (F1)', () => {
 });
 
 describe('validateSettings (F5)', () => {
-  it('정수 범위 안이면 통과', () => {
-    const r = validateSettings({ sensitivity: 'high', warningSeconds: '12', rewarningSeconds: '60', sound: false });
-    expect(r).toEqual({ ok: true, settings: { sensitivity: 'high', warningSeconds: 12, rewarningSeconds: 60, sound: false } });
+  it('양의 정수면 통과 (입력 상한은 미확정이라 두지 않는다)', () => {
+    expect(validateSettings({ warningSeconds: '12', rewarningSeconds: '600' }))
+      .toEqual({ ok: true, settings: { warningSeconds: 12, rewarningSeconds: 600 } });
+    expect(validateSettings({ warningSeconds: '1000', rewarningSeconds: '1' }).ok).toBe(true);
   });
 
-  it.each([['0'], ['301'], ['1.5'], [''], ['abc']])('경고 시간 %s는 저장하지 않고 이유를 준다', (value) => {
-    const r = validateSettings({ sensitivity: 'normal', warningSeconds: value, rewarningSeconds: '60' });
+  it.each([['0'], ['-1'], ['1.5'], [''], ['abc']])('경고 시간 %s는 저장하지 않고 이유를 준다 (S8)', (value) => {
+    const r = validateSettings({ warningSeconds: value, rewarningSeconds: '60' });
     expect(r.ok).toBe(false);
-    expect(r.errors[0]).toContain('경고 시간은 1~300');
-  });
-
-  it('재경고 간격 범위 10~600', () => {
-    expect(validateSettings({ sensitivity: 'normal', warningSeconds: '10', rewarningSeconds: '9' }).ok).toBe(false);
-    expect(validateSettings({ sensitivity: 'normal', warningSeconds: '10', rewarningSeconds: '600' }).ok).toBe(true);
+    expect(r.errors).toEqual({ warningSeconds: '양의 정수를 입력해 주세요' });
   });
 });
 
