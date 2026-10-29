@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { CardVisual } from "@/components/card/CardVisual";
 import { Panel } from "@/components/ui/Panel";
 import { cards, getCard } from "@/lib/cards";
-import { targetLabel, won } from "@/lib/format";
+import { capLabel, targetLabel, won } from "@/lib/format";
 import styles from "./page.module.css";
 
 export function generateStaticParams() {
@@ -57,11 +57,16 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
                   <tr key={b.category}>
                     <td>{b.category}</td>
                     <td>{b.rate}%</td>
-                    <td>{won(b.cap)}</td>
+                    <td>{capLabel(b.cap)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            <p className={`muted ${styles.note}`}>카드 전체 월 할인 한도: {capLabel(card.totalCap)}</p>
+          </Panel>
+
+          <Panel title="계산에 반영한 방식">
+            <p>{card.note}</p>
           </Panel>
 
           <Panel title="정보 출처">

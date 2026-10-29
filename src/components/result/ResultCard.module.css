@@ -53,3 +53,9 @@
     grid-template-columns: 1fr 1fr;
   }
 }
+
+.capNote {
+  margin-top: var(--space-2);
+  font-size: 13px;
+  color: var(--color-muted);
+}

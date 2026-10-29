@@ -60,6 +60,9 @@ export function ResultCard({ rank, result, current, inCompare, onToggleCompare }
           ))}
         </ul>
       )}
+      {result.card.totalCap !== null && result.parts.reduce((s, p) => s + p.amount, 0) > result.monthly && (
+        <p className={styles.capNote}>카드 전체 월 할인 한도 {won(result.card.totalCap)}까지만 받아요</p>
+      )}
     </CardRow>
   );
 }

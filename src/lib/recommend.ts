@@ -11,9 +11,13 @@ export function evaluate(card: Card, spend: Spending): Evaluation {
     return { card, monthly: 0, yearly: -card.annualFee, parts: [], shortOfMinSpend: true };
   }
   const parts = card.benefits
-    .map((b) => ({ category: b.category, amount: Math.min(Math.floor((spend[b.category] * b.rate) / 100), b.cap) }))
+    .map((b) => ({
+      category: b.category,
+      amount: Math.min(Math.floor((spend[b.category] * b.rate) / 100), b.cap ?? Infinity),
+    }))
     .filter((p) => p.amount > 0);
-  const monthly = parts.reduce((sum, p) => sum + p.amount, 0);
+  const sum = parts.reduce((acc, p) => acc + p.amount, 0);
+  const monthly = Math.min(sum, card.totalCap ?? Infinity);
   return { card, monthly, yearly: monthly * 12 - card.annualFee, parts, shortOfMinSpend: false };
 }
 

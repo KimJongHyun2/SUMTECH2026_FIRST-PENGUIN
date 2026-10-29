@@ -54,11 +54,12 @@ type Category = "식비·카페" | "대중교통" | "편의점" | "온라인쇼�
 type Status = "대학생" | "군인" | "직장인" | "기타";
 type Target = "전체" | "대학생" | "군인";
 
-interface Benefit { category: Category; rate: number /* % */; cap: number /* 월 한도(원) */ }
+interface Benefit { category: Category; rate: number /* % */; cap: number | null /* 월 한도(원), null=없음 */ }
 interface Card {
   id: string; name: string; issuer: string; type: "신용" | "체크";
   annualFee: number; target: Target; minAge: number; minSpend: number /* 전월실적(원) */;
-  benefits: Benefit[]; sourceUrl: string | null; checkedAt: string | null /* YYYY-MM-DD */;
+  benefits: Benefit[]; totalCap: number | null /* 카드 전체 월 한도 */; note: string /* 반영 방식 */;
+  sourceUrl: string | null; checkedAt: string | null /* YYYY-MM-DD */;
 }
 interface FormState {
   status: Status | ""; age: string; cardType: "상관없음" | "신용카드" | "체크카드"; feeCap: string;
@@ -73,8 +74,8 @@ interface Evaluation { card: Card; monthly: number; yearly: number; parts: { cat
 evaluate(card, spend):
   total = Σ spend
   if total < card.minSpend → monthly 0, parts [], shortOfMinSpend true
-  parts = card.benefits 각각 min(floor(spend[b.category] × b.rate / 100), b.cap), 0원 초과만
-  monthly = Σ parts, yearly = monthly × 12 − card.annualFee
+  parts = card.benefits 각각 min(floor(spend[b.category] × b.rate / 100), b.cap ?? ∞), 0원 초과만
+  monthly = min(Σ parts, totalCap ?? ∞), yearly = monthly × 12 − card.annualFee
 
 recommend(cards, form):
   filter: (target = "전체" or target = status) and age ≥ minAge and (cardType 상관없음 or 종류 일치) and annualFee ≤ feeCap(비면 ∞)

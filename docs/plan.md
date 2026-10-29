@@ -18,10 +18,11 @@
 - [ ] F3 실제 AI 연결 확인 (학생이 AI_GATEWAY_API_KEY 설정 후 작은 요청 1번)
 - 검증: 브라우저에서 S1~S8 직접 실행
 
-### 3. 카드 데이터 (F1) — **가장 급함**
-- [ ] `data/cards.json`을 실제 카드 20장 이상으로 교체 (지금은 샘플 10장, 출처 없음 → F1 완료 조건 미충족)
-- [ ] 대학생 대상·군인 대상 카드 각 1장 이상, 모든 카드에 sourceUrl·checkedAt
-- [ ] 데이터 검사 스크립트(`npm run check:data`)로 F1 완료 조건 자동 확인
+### 3. 카드 데이터 (F1)
+- [x] `data/cards.json`을 실제 카드 21장으로 교체 (카드고릴라 공개 카드 상세, 2026-10-29 확인, 신용 8·체크 13)
+- [x] 대학생 대상(티머니 노리 학생증)·군인 대상(나라사랑 3종) 카드, 모든 카드에 sourceUrl·checkedAt
+- [x] 데이터 검사 스크립트(`npm run check:data`)로 F1 완료 조건 자동 확인, `npm run build` 앞에 실행
+- [ ] 팀이 카드별 note(단순화 내용)를 훑어보고 틀린 곳 고치기
 
 ### 4. docker·배포·CI
 - [ ] Dockerfile(빌드는 Dockerfile 안에서, 시작 명령은 서버 실행만), docker-compose.yml(app만 3000 포트)
