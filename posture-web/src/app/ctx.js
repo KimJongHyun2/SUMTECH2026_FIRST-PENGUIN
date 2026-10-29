@@ -1,7 +1,10 @@
 // 화면들이 함께 쓰는 상태·라우터·카메라·저장. 화면 전환 중에도 카메라와 세션이 끊기지 않도록 한 페이지 안에서 주소만 바꾼다.
 import { APP_ROUTES } from '../../shared/routes.js';
 import { FrontCamera } from './camera.js';
+import { RecordedInput, evalActive } from './eval.js';
 import { $ } from './format.js';
+
+export const EVAL = evalActive();
 
 export const app = {
   view: '/',
@@ -19,15 +22,21 @@ export const app = {
   reportSessionId: null,
   reportReturn: '/',
   saveChain: Promise.resolve(true),
+  replay: null,            // 평가 모드의 녹화 입력 연속 재생
+  reportAccelPending: null, // 탐지 시작 전에 누른 '[테스트용] 리포트 3초 가속'
 };
 
-export const camera = new FrontCamera($('video'), $('preview'));
+export const recorded = EVAL ? new RecordedInput() : null;
+export const camera = new FrontCamera($('video'), $('preview'), recorded);
 
 const renderers = {};
 const liveRenderers = [];
+const routeHooks = [];
 
 export const onView = (path, render) => { renderers[path] = render; };
 export const onLive = (render) => { liveRenderers.push(render); };
+/** 화면이 바뀔 때마다 (화면 사이를 옮겨 다니는 공용 요소 배치용) */
+export const onRoute = (hook) => { routeHooks.push(hook); };
 
 export function route(path) {
   app.view = path === '/' || APP_ROUTES.includes(path) ? path : '/';
@@ -35,6 +44,7 @@ export function route(path) {
     section.hidden = section.dataset.view !== app.view;
   });
   placeCamera();
+  routeHooks.forEach((hook) => hook());
   renderers[app.view]?.();
 }
 

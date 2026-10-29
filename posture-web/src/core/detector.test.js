@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BaselineCollector, evaluateFrame, frameQuality } from './detector.js';
-import { validateSettings } from './policy.js';
+import { sameSettings, validateSettings } from './policy.js';
 import { windowMetrics } from './report.js';
 
 const s = (hf, nl, pitch, vis = 0.9) => ({ head_forward: hf, neck_len: nl, pitch_deg: pitch, ear_vis: vis, shoulder_vis: vis });
@@ -92,8 +92,8 @@ describe('BaselineCollector (F1)', () => {
 
 describe('validateSettings (F5)', () => {
   it('양의 정수면 통과 (입력 상한은 미확정이라 두지 않는다)', () => {
-    expect(validateSettings({ warningSeconds: '12', rewarningSeconds: '600' }))
-      .toEqual({ ok: true, settings: { warningSeconds: 12, rewarningSeconds: 600 } });
+    expect(validateSettings({ warningSeconds: '12', rewarningSeconds: '600', sensitivity: 'high', sound: true }))
+      .toEqual({ ok: true, settings: { warningSeconds: 12, rewarningSeconds: 600, sensitivity: 'high', sound: true } });
     expect(validateSettings({ warningSeconds: '1000', rewarningSeconds: '1' }).ok).toBe(true);
   });
 
@@ -101,6 +101,24 @@ describe('validateSettings (F5)', () => {
     const r = validateSettings({ warningSeconds: value, rewarningSeconds: '60' });
     expect(r.ok).toBe(false);
     expect(r.errors).toEqual({ warningSeconds: '양의 정수를 입력해 주세요' });
+  });
+
+  it('같은 값 재적용은 바뀐 설정이 아니다 (S8: 0 거부 뒤 기존과 같은 10초)', () => {
+    const current = { warningSeconds: 10, rewarningSeconds: 60 }; // 예전 저장 형식도 기본 민감도·소리로 본다
+    expect(sameSettings(validateSettings({ warningSeconds: '10', rewarningSeconds: '60' }).settings, current)).toBe(true);
+    expect(sameSettings(validateSettings({ warningSeconds: '10', rewarningSeconds: '60', sound: true }).settings, current)).toBe(false);
+  });
+});
+
+describe('민감도 (F5)', () => {
+  const base = s(0.33, 0.75, 0);
+  it('높음은 작은 변화도, 낮음은 큰 변화만 이탈로 본다', () => {
+    const slight = s(0.33 + 0.02, 0.75, 0); // 보통 경계 0.025보다 작다
+    expect(evaluateFrame(slight, base, 'normal').deviated).toBe(false);
+    expect(evaluateFrame(slight, base, 'high').deviated).toBe(true);
+    const clear = s(0.33 + 0.03, 0.75, 0);
+    expect(evaluateFrame(clear, base, 'normal').types).toEqual(['head_forward']);
+    expect(evaluateFrame(clear, base, 'low').deviated).toBe(false);
   });
 });
 

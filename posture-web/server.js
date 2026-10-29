@@ -1,9 +1,10 @@
-// 운영 서버: 빌드 결과(dist) 제공, /__health, 없는 주소 404.
+// 운영 서버: 빌드 결과(dist) 제공, /__health, 없는 주소 404, 딥 모드 중계(/relay).
 // docker-compose.yml의 app이 이 파일로 0.0.0.0:3000에서 받는다.
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { attachRelay } from './shared/relay.js';
 import { APP_ROUTES } from './shared/routes.js';
 
 const MIME = {
@@ -17,6 +18,7 @@ const MIME = {
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
   '.ico': 'image/x-icon',
+  '.webm': 'video/webm',
 };
 
 const isFile = async (path) => {
@@ -82,7 +84,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const distDir = join(fileURLToPath(new URL('.', import.meta.url)), 'dist');
   const port = Number(process.env.PORT ?? 3000);
   const releaseId = process.env.RELEASE_ID || 'dev';
-  createAppServer({ distDir, releaseId }).listen(port, '0.0.0.0', () => {
+  const server = createAppServer({ distDir, releaseId });
+  attachRelay(server);
+  server.listen(port, '0.0.0.0', () => {
     console.log(`패스트거북이 서버 0.0.0.0:${port} releaseId=${releaseId}`);
   });
 }

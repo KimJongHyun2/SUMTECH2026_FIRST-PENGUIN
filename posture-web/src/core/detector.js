@@ -1,6 +1,6 @@
 // 한 프레임의 입력 품질과 기준 대비 이탈을 판정한다.
 // 경계값은 p1 T1 데이터에서 잡은 파일럿 값이며 실측으로 다시 정한다(docs/prd.md 2절).
-import { POLICY } from './policy.js';
+import { POLICY, SENSITIVITY } from './policy.js';
 
 export const MODEL_VERSION = 'pose_landmarker_lite/float16/1+face_landmarker/float16/1';
 
@@ -44,15 +44,19 @@ export function averageSamples(samples) {
   return avg;
 }
 
-/** 기준 대비 이탈 여부와 유형. 유형은 기록용이며 사용자에게는 공통 경고만 보인다. */
-export function evaluateFrame(sample, baseline) {
+/**
+ * 기준 대비 이탈 여부와 유형. 경고는 공통 문구이고, 유형은 기록과 상태 문구('머리가 기준보다 앞으로 나왔어요')에 쓴다.
+ * sensitivity는 설정의 민감도(low·normal·high)로, 경계에 배율을 곱한다.
+ */
+export function evaluateFrame(sample, baseline, sensitivity = 'normal') {
   const quality = frameQuality(sample, baseline);
   if (quality !== 'valid' || !baseline) return { quality, deviated: false, types: [] };
+  const k = SENSITIVITY[sensitivity]?.scale ?? 1;
   const types = [];
-  if (sample.head_forward - baseline.head_forward >= LIMITS.headForward) types.push('head_forward');
-  if (sample.neck_len - baseline.neck_len <= -LIMITS.neckLen) types.push('neck_len');
+  if (sample.head_forward - baseline.head_forward >= LIMITS.headForward * k) types.push('head_forward');
+  if (sample.neck_len - baseline.neck_len <= -LIMITS.neckLen * k) types.push('neck_len');
   if (typeof sample.pitch_deg === 'number' && typeof baseline.pitch_deg === 'number'
-    && sample.pitch_deg - baseline.pitch_deg >= LIMITS.pitch) types.push('pitch');
+    && sample.pitch_deg - baseline.pitch_deg >= LIMITS.pitch * k) types.push('pitch');
   return { quality, deviated: types.length > 0, types };
 }
 

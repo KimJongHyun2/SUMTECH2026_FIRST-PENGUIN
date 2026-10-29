@@ -6,10 +6,12 @@ import { POSE, frontSignals, largestPose, pitchFromMatrix } from '../signals.js'
 const FROZEN_MS = 1500;
 
 export class FrontCamera {
-  constructor(video, canvas) {
+  /** recorded: 평가 모드의 녹화 입력(RecordedInput). 있으면 실제 카메라 권한을 요청하지 않는다. */
+  constructor(video, canvas, recorded = null) {
     this.video = video;
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
+    this.recorded = recorded;
     this.on = false;
     this.models = null;
     this.lastVideoTime = -1;
@@ -17,19 +19,25 @@ export class FrontCamera {
     this.label = '';
   }
 
-  /** 실패하면 브라우저 오류(NotAllowedError 등)를 그대로 던진다. */
+  /** 실패하면 브라우저 오류(NotAllowedError 등)나 EvalInputError를 그대로 던진다. */
   async start() {
     this.models ??= await Promise.all([createPose('lite'), createFace()]);
-    await startCamera(this.video, 'user');
+    if (this.recorded) {
+      await this.recorded.start(this.video);
+      this.label = this.recorded.label;
+    } else {
+      await startCamera(this.video, 'user');
+      this.label = this.video.srcObject.getVideoTracks()[0]?.label ?? '';
+    }
     this.canvas.width = this.video.videoWidth;
     this.canvas.height = this.video.videoHeight;
-    this.label = this.video.srcObject.getVideoTracks()[0]?.label ?? '';
     this.lastVideoTime = -1;
     this.frozenSince = null;
     this.on = true;
   }
 
   stop() {
+    this.recorded?.stop();
     this.video.srcObject?.getTracks().forEach((track) => track.stop());
     this.video.srcObject = null;
     this.on = false;
@@ -106,6 +114,8 @@ function largestFaceIndex(faces = []) {
 }
 
 export function cameraErrorMessage(error) {
+  // 평가 입력 실패는 실제 카메라 권한 문제와 구분해 그대로 알린다.
+  if (error?.name === 'EvalInputError') return error.message;
   if (error?.name === 'NotAllowedError' || error?.name === 'SecurityError') {
     return "카메라를 쓸 수 없어요. 브라우저 주소창의 카메라 권한을 허용한 뒤 '카메라 켜기'를 다시 눌러 주세요.";
   }

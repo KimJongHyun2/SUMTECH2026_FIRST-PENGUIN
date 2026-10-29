@@ -92,7 +92,7 @@ a { color: inherit; }
 .checks li.ok::before { content: "● "; color: var(--brand); }
 
 .field { display: grid; gap: 4px; margin: 8px 0; font-weight: 600; }
-.field input { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); max-width: 200px; }
+.field input, .field select { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); max-width: 200px; }
 .field .error { font-size: 0.85rem; min-height: 1.2em; }
 .field-inline { display: flex; gap: 8px; align-items: center; }
 
@@ -103,4 +103,5 @@ a { color: inherit; }
 
 .session-list { list-style: none; padding: 0; margin: 0 0 12px; display: grid; gap: 8px; }
 .session-item { width: 100%; text-align: left; border-radius: 12px; }
+.test-tools { border: 2px dashed var(--muted); border-radius: 12px; padding: 12px; margin-top: 16px; }
 .confirm { border: 2px solid var(--error); border-radius: 12px; padding: 16px; margin: 12px 0; }

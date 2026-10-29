@@ -8,6 +8,7 @@
 posture-web/data
 posture-web/results
 posture-web/public/mediapipe
-e2e
+e2e/*
+!e2e/fixtures
 tools
 docs
