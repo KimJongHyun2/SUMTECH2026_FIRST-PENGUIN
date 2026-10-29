@@ -1,0 +1,12 @@
+{
+  "name": "first-penguin-tools",
+  "private": true,
+  "type": "module",
+  "description": "docs/problem.yaml·scenarios.yaml 자가 검사. 루트 앱과 별도 패키지.",
+  "scripts": {
+    "check": "node check-problem.mjs"
+  },
+  "dependencies": {
+    "js-yaml": "4.1.0"
+  }
+}

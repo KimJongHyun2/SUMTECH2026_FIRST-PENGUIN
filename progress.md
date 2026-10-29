@@ -6,7 +6,9 @@ Agent가 서비스 저장소 루트의 `progress.md`로 복사해 이어 쓴다(
 
 - 실제 서비스 저장소 폴더: C:\Users\jonghyun\github\SUMTECH2026_FIRST-PENGUIN (main)
 - 현재 단계 / 다음 행동: 2단계 진행 중. 팀명 패스트거북이, 거북목 교정 웹사이트로 문제정의(docs/problem.yaml)와 PRD(docs/prd.md) 초안 작성. 다음은 학생 답 대기 칸(E1·P1·측정 영향)과 PRD의 가정값 확인, 그 뒤 technical-design.md·plan.md.
-- 학생에게 확인할 내용: 친구가 거북목이라고 알려 준 실제 장면(E1), 실제 대상 1명(P1), 측정 가능한 영향. PRD 10장의 가정값(알림 5분·알림 방식·로그인 없음·desktop·localStorage)이 맞는지. 기술 스택은 PRD 확정 뒤 정한다.
+- 학생에게 확인할 내용: 친구가 거북목이라고 알려 준 실제 장면(E1), 실제 대상 1명(P1), 측정 가능한 영향. PRD 10장의 가정값(경고 30초·알림 방식·로그인 없음·desktop·localStorage)이 맞는지. 기술 스택은 PRD 확정 뒤 정한다.
+- 대시보드 첫 점수 13.5 (2026-10-29 밤). 자가 검사 `tools/check-problem.mjs`: problem.yaml 16블록 중 11 채움, 비어 있는 5개 = measurable·personas·experiences·sources·insight.evidence. 진단은 docs/scoring-strategy.md 5장.
+- docs/scenarios.yaml S1~S6 push 완료(3f1f387). 학생이 대시보드에서 흐름 표시를 확인하면 2단계 항목 체크.
 - 복원 기준: 초기 준비 커밋 f76fc5f의 파일 5개를 복원하고, docs/problem.yaml의 이전 아이디어 내용은 null / []로 비웠다. 기존 구현 파일은 포함하지 않는다.
 - 대회 사이트의 단계 표시·점수 갱신은 이번 복원에서 확인하지 않았다. 아래 사이트 연동 항목은 기존 확인 기록을 유지한다.
 
