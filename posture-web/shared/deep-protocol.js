@@ -11,6 +11,8 @@ export const CONNECTION_PILOT = Object.freeze({
 });
 
 export const MAX_MESSAGE_BYTES = 2048;
+// 측면 영상 연결 정보(SDP)는 2KB를 넘으므로 'rtc' 메시지에만 더 큰 한도를 둔다.
+export const MAX_RTC_MESSAGE_BYTES = 16384;
 export const MAX_MESSAGES_PER_SECOND = 20;
 export const TOKEN_PATTERN = /^[A-Za-z0-9_-]{24}$/;
 
@@ -31,6 +33,7 @@ export const ERRORS = Object.freeze({
   not_linked: '연결된 휴대폰이 없어요.',
   stale_input: '측면 입력이 너무 오래돼 전달하지 않았어요.',
   bad_side: '측면 입력 값이 올바르지 않아요.',
+  bad_rtc: '측면 영상 연결 정보가 올바르지 않아요.',
 });
 
 const isFiniteIn = (v, min, max) => typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max;
@@ -49,4 +52,14 @@ export function parseSide(msg) {
   return {
     seq: msg.seq, t: msg.t, valid: msg.valid, angleDeg: msg.angleDeg, earVis: msg.earVis, shoulderVis: msg.shoulderVis,
   };
+}
+
+/**
+ * 측면 영상 연결 신호: { type:'rtc', kind:'offer'|'answer', sdp }
+ * 휴대폰이 offer, PC가 answer를 보낸다. 서버는 연결된 상대에게 전달만 하며 영상은 서버를 거치지 않는다.
+ * @returns 정규화한 신호 또는 null
+ */
+export function parseRtc(msg, kind) {
+  if (msg.kind !== kind || typeof msg.sdp !== 'string' || !msg.sdp.startsWith('v=0')) return null;
+  return { kind, sdp: msg.sdp };
 }

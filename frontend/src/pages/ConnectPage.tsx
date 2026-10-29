@@ -156,7 +156,8 @@ export function ConnectPage() {
         </p>
       )}
       <p className="text-sm text-muted">
-        영상은 전송하지 않고 측면 각도와 입력 품질만 전달해요.
+        측면 영상은 휴대폰에서 이 PC로 직접 전송해 화면에만 보여 주고 저장하지
+        않아요.
       </p>
       <TestTools />
     </section>

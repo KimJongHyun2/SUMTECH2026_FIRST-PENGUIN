@@ -3,6 +3,7 @@ import {
   PairingService,
   type RelayMessage,
 } from "../connection/PairingService";
+import { SideVideoLink } from "../connection/SideVideoLink";
 import { loadData, freshData, type RecordStore } from "../history/storage";
 import {
   EVAL,
@@ -79,12 +80,15 @@ export interface SessionState {
   token: string;
   tokenExpiresAt: number;
   remote: { quality: string; angle: number | null; at: number } | null;
+  // 딥 모드 PC: 휴대폰에서 받은 측면 영상(화면 표시용, 저장하지 않음)
+  sideStream: MediaStream | null;
   phoneStop: "none" | "requested" | "confirmed" | "unconfirmed";
   testStatus: string;
 }
 export class SessionController {
   readonly camera: CameraService;
   readonly pairing: PairingService;
+  private readonly sideVideo: SideVideoLink;
   private listeners = new Set<() => void>();
   private engine: Engine | null = null;
   private collector = createCollector();
@@ -134,6 +138,7 @@ export class SessionController {
       token: "",
       tokenExpiresAt: 0,
       remote: null,
+      sideStream: null,
       phoneStop: "none",
       testStatus: "",
     };
@@ -144,6 +149,10 @@ export class SessionController {
       this.recorded,
     );
     this.pairing = new PairingService((message) => this.onConnection(message));
+    this.sideVideo = new SideVideoLink(
+      (message) => this.pairing.send(message),
+      (sideStream) => this.update({ sideStream }),
+    );
     // 휴대폰에는 개인 기록을 저장하지 않는다.
     this.writes = phone ? Promise.resolve() : this.load();
   }
@@ -244,6 +253,7 @@ export class SessionController {
   confirmPlacement = (confirmed: boolean) => this.update({ confirmed });
   private stopCamera() {
     this.cameraRequest++;
+    if (this.phone) this.sideVideo.close();
     this.camera.stop();
     this.update({
       cameraStatus: "off",
@@ -269,6 +279,9 @@ export class SessionController {
         confirmed: false,
         notice: "카메라 배치와 앉은 자세를 확인해 주세요.",
       });
+      // 휴대폰은 측면 영상을 PC 화면에 보여 주도록 보낸다. 실패해도 측면 각도 전송·판정은 계속한다.
+      if (this.phone && this.camera.stream)
+        void this.sideVideo.offer(this.camera.stream).catch(() => {});
     } catch (error) {
       if (request !== this.cameraRequest) return;
       const e = error as Error;
@@ -617,6 +630,7 @@ export class SessionController {
   private closePairing() {
     clearTimeout(this.phoneStopTimer);
     this.closeAfterPhoneStop = false;
+    this.sideVideo.close();
     this.pairing.close();
     this.update({ connection: "idle", remote: null });
   }
@@ -651,6 +665,7 @@ export class SessionController {
   }
   private phoneStopped(confirmed: boolean) {
     clearTimeout(this.phoneStopTimer);
+    this.sideVideo.close();
     this.update({
       phoneStop: confirmed ? "confirmed" : "unconfirmed",
       connection: "idle",
@@ -676,6 +691,7 @@ export class SessionController {
     void this.save();
   };
   private linkLost(notice: string) {
+    this.sideVideo.close();
     if (this.phone) this.stopCamera();
     else if (this.engine?.mode === "deep")
       this.handle(this.engine.enterRecovery(Date.now()));
@@ -767,6 +783,9 @@ export class SessionController {
         });
         break;
       // 양쪽
+      case "rtc":
+        void this.sideVideo.receive(message).catch(() => {});
+        break;
       case "link.approved":
         this.update({ connection: "approved" });
         break;
@@ -840,6 +859,7 @@ export class SessionController {
   dispose = () => {
     if (this.engine && this.engine.state !== "ended") this.pause();
     this.camera.dispose();
+    this.sideVideo.close();
     this.pairing.close();
     void this.audio?.close();
   };

@@ -1,6 +1,6 @@
 // HTTP 서버에 딥 모드 WebSocket 중계를 붙인다. 연결 정책은 브라우저 폴백과 공유한다.
 import { WebSocketServer } from 'ws';
-import { MAX_MESSAGE_BYTES } from './deep-protocol.js';
+import { MAX_RTC_MESSAGE_BYTES } from './deep-protocol.js';
 import { ConnectionHub } from './connection-hub.js';
 export { ConnectionHub } from './connection-hub.js';
 
@@ -27,7 +27,7 @@ function reject(socket, status) {
  * @returns {{ hub: ConnectionHub, close(): void }}
  */
 export function attachRelay(httpServer, { hub = new ConnectionHub(), log = console.error } = {}) {
-  const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_MESSAGE_BYTES * 2 });
+  const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_RTC_MESSAGE_BYTES * 2 });
   const timer = setInterval(() => {
     try {
       hub.sweep();

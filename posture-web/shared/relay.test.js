@@ -298,6 +298,49 @@ describe('측면 입력 전달·검증', () => {
   });
 });
 
+describe('측면 영상 연결 신호 전달', () => {
+  const sdp = `v=0\r\n${'a=candidate:x\r\n'.repeat(300)}`; // 2KB보다 큰 실제 크기의 SDP
+
+  it('휴대폰 offer는 연결된 PC로, PC answer는 그 휴대폰으로만 전달한다', () => {
+    const { pc, phone } = linkPair();
+    const other = linkPair();
+    send(phone, { type: 'rtc', kind: 'offer', sdp });
+    expect(last(pc, 'rtc')).toEqual({ type: 'rtc', kind: 'offer', sdp });
+    send(pc, { type: 'rtc', kind: 'answer', sdp: 'v=0\r\n' });
+    expect(last(phone, 'rtc')).toEqual({ type: 'rtc', kind: 'answer', sdp: 'v=0\r\n' });
+    expect(all(other.pc, 'rtc')).toHaveLength(0);
+    expect(all(other.phone, 'rtc')).toHaveLength(0);
+  });
+
+  it('승인 전 신호와 역할에 맞지 않는 신호·형식이 잘못된 신호는 거부한다', () => {
+    const pc = join('pc');
+    const phone = join('phone');
+    request(phone, issue(pc));
+    send(phone, { type: 'rtc', kind: 'offer', sdp });
+    expect(last(phone, 'error').code).toBe('not_approved');
+    expect(all(pc, 'rtc')).toHaveLength(0);
+
+    const linked = linkPair();
+    send(linked.pc, { type: 'rtc', kind: 'offer', sdp });
+    send(linked.phone, { type: 'rtc', kind: 'answer', sdp });
+    send(linked.phone, { type: 'rtc', kind: 'offer', sdp: 'nope' });
+    expect(last(linked.pc, 'error').code).toBe('bad_rtc');
+    expect(all(linked.phone, 'error').map((m) => m.code)).toEqual(['bad_rtc', 'bad_rtc']);
+    expect(all(linked.pc, 'rtc')).toHaveLength(0);
+    expect(all(linked.phone, 'rtc')).toHaveLength(0);
+  });
+
+  it('신호도 16KB를 넘으면 거부하고, 다른 메시지는 계속 2KB로 제한한다', () => {
+    const { pc, phone } = linkPair();
+    send(phone, { type: 'rtc', kind: 'offer', sdp: `v=0\r\n${'x'.repeat(17_000)}` });
+    expect(last(phone, 'error').code).toBe('bad_message');
+    send(phone, side(0, { pad: 'x'.repeat(3000) }));
+    expect(last(phone, 'error').code).toBe('bad_message');
+    expect(all(pc, 'rtc')).toHaveLength(0);
+    expect(all(pc, 'side')).toHaveLength(0);
+  });
+});
+
 describe('입력 중단·연결 유실 (F10)', () => {
   it('측면 입력이 2초 넘게 없으면 입력 중단, 다시 오면 재개를 알린다', () => {
     const { pc, phone } = linkPair();

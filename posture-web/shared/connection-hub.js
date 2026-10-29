@@ -1,6 +1,6 @@
 // 서버와 브라우저 폴백이 공유하는 연결 상태 머신이다. 영상·기록은 저장하지 않는다.
 import {
-  CONNECTION_PILOT, ERRORS, MAX_MESSAGE_BYTES, MAX_MESSAGES_PER_SECOND, TOKEN_PATTERN, parseSide,
+  CONNECTION_PILOT, ERRORS, MAX_MESSAGE_BYTES, MAX_MESSAGES_PER_SECOND, MAX_RTC_MESSAGE_BYTES, TOKEN_PATTERN, parseRtc, parseSide,
 } from './deep-protocol.js';
 
 const TOMBSTONE_MS = 10 * 60 * 1000;
@@ -91,9 +91,12 @@ export class ConnectionHub {
     }
     let msg;
     try {
-      if (typeof raw !== 'string' || new TextEncoder().encode(raw).byteLength > MAX_MESSAGE_BYTES) throw new Error();
+      if (typeof raw !== 'string') throw new Error();
+      const bytes = new TextEncoder().encode(raw).byteLength;
+      if (bytes > MAX_RTC_MESSAGE_BYTES) throw new Error();
       msg = JSON.parse(raw);
       if (!msg || typeof msg.type !== 'string') throw new Error();
+      if (msg.type !== 'rtc' && bytes > MAX_MESSAGE_BYTES) throw new Error();
     } catch {
       this.#error(client, 'bad_message');
       return;
@@ -198,6 +201,10 @@ export class ConnectionHub {
       this.#send(link.phone, { type: 'stop.request', stopId: link.stop.id });
       this.#send(pc, { type: 'stop.requested', stopId: link.stop.id, deadline: t + this.phoneStopMs });
     },
+
+    rtc(pc, msg) {
+      this.#relayRtc(pc, msg, 'answer');
+    },
   };
 
   // ------------------------------------------------------------ 휴대폰
@@ -250,12 +257,25 @@ export class ConnectionHub {
         phone: { type: 'link.closed', reason: 'stopped' },
       });
     },
+
+    rtc(phone, msg) {
+      this.#relayRtc(phone, msg, 'offer');
+    },
   };
 
   // ------------------------------------------------------------ 내부
 
   #links() {
     return [...this.clients].filter((c) => c.role === 'pc' && c.link).map((c) => c.link);
+  }
+
+  /** 측면 영상 연결 신호는 승인된 연결의 상대에게만 전달한다. 휴대폰은 offer, PC는 answer만 보낸다. */
+  #relayRtc(client, msg, kind) {
+    const link = client.link;
+    if (!link) return this.#error(client, client.role === 'pc' ? 'not_linked' : 'not_approved');
+    const rtc = parseRtc(msg, kind);
+    if (!rtc) return this.#error(client, 'bad_rtc');
+    this.#send(client === link.pc ? link.phone : link.pc, { type: 'rtc', ...rtc });
   }
 
   #pendingOf(pc, requestId) {
