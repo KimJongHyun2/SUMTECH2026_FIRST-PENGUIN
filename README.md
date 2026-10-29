@@ -15,14 +15,19 @@
 
 ## 기술 구성
 
-Next.js 15 (App Router) · React 19 · TypeScript (strict) · CSS Modules. 카드 데이터는 `data/cards.json`(읽기 전용, DB 없음), 입력값은 브라우저 sessionStorage에만 저장해요.
+Next.js 15 (App Router) · React 19 · TypeScript (strict) · CSS Modules. 데스크톱 웹 기준(헤더 + 2단 레이아웃, 좁은 화면은 1단). 카드 데이터는 `data/cards.json`(읽기 전용, DB 없음), 입력값은 브라우저 sessionStorage에만 저장해요.
 
 ```
-app/          화면(/, /find, /result, /compare, /cards, /cards/[id]) · api/parse-spending · __health
-components/   화면 조각 + .module.css
-lib/          types · constants · recommend(계산, 순수 함수) · parse-spending(AI) · cards · format
-data/         cards.json
+src/
+  app/          라우트(/, /find, /result, /compare, /cards, /cards/[id]) · api/parse-spending · __health
+  components/   layout · ui(Button·Field·Panel·Badge) · card · find · result · compare  (각자 .module.css)
+  providers/    FormProvider (입력 상태)
+  lib/          types · constants · cards · recommend(계산, 순수 함수) · format · parse-spending(AI)
+  styles/       globals.css (디자인 토큰)
+data/cards.json
 ```
+
+자세한 구조와 규칙은 [docs/spec.md](docs/spec.md) 2장을 봐 주세요.
 
 ## 실행
 

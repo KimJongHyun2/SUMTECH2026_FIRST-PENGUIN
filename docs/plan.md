@@ -7,6 +7,7 @@
 
 ### 1. 뼈대 (Next.js + TS + CSS Modules)
 - [x] package.json, tsconfig(strict), next.config(standalone 출력)
+- [x] src/ 구조(app·components/{layout,ui,card,find,result,compare}·providers·lib·styles), 데스크톱 웹 2단 레이아웃
 - [x] lib/types·constants·format·recommend (순수 함수)
 - [x] 화면 6개 + not-found + /__health
 - 검증: `npm run typecheck`, `npm run build` 통과
@@ -29,7 +30,7 @@
 - [ ] CI(workflows/scenarios.yml) 성공 후 자동 배포
 
 ### 5. E2E
-- [ ] e2e/scenarios/S1~S8.spec.ts (scenarios.yaml steps 그대로, 휴대폰 화면)
+- [ ] e2e/scenarios/S1~S8.spec.ts (scenarios.yaml steps 그대로, 데스크톱 화면)
 - [ ] `docker compose up -d --build` 후 `npx playwright test` 전부 통과
 
 ### 6. 기획 근거 채우기 (팀)
@@ -43,3 +44,4 @@
 | 10-29 | F8 지금 카드와 비교 추가 | 멘토 피드백: 뱅크샐러드와 차이, 추천에서 하나 더 |
 | 10-29 | Next.js + TS + CSS Modules | AI 키 서버 처리·/__health·404를 앱 하나로, 프론트 개발자가 다듬기 쉬움 |
 | 10-29 | 카드 데이터는 DB 없이 JSON | 읽기 전용 데이터라 DB가 필요 없음 |
+| 10-29 | platform mobile → desktop | 웹 서비스로 만들고, 카드 여러 장을 나란히 비교하는 화면이 핵심이라 넓은 화면 기준(뱅크샐러드 웹 카드 목록 참고) |

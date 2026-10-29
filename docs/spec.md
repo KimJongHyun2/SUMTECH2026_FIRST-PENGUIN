@@ -9,36 +9,43 @@
 |---|---|---|
 | 프레임워크 | Next.js 15 App Router + React 19 | AI 키를 서버에서만 쓰는 API, `/__health`, 404를 앱 하나로 처리 |
 | 언어 | TypeScript (strict) | 카드·입력·계산 결과 타입을 고정해 기획과 코드의 어긋남을 줄임 |
-| 스타일 | CSS Modules + `app/globals.css`의 CSS 변수(디자인 토큰) | 추가 의존성 없이 컴포넌트별 스타일 분리 |
+| 스타일 | CSS Modules + `src/styles/globals.css`의 CSS 변수(디자인 토큰) | 추가 의존성 없이 컴포넌트별 스타일 분리 |
 | 데이터 | `data/cards.json` (읽기 전용, 서버에서 import) | 카드 정보는 사용자가 바꾸지 않아 DB가 필요 없음 |
 | 상태 | React Context + sessionStorage(`card-finder-form`) | 로그인 없이 새로고침·뒤로 가기에도 입력 유지 |
 | AI | Vercel AI Gateway (OpenAI 호환 `/v1/chat/completions`), 모델은 `AI_MODEL` 환경변수 | 키가 없으면 규칙 기반 추출로 대신(F3) |
 
-## 2. 폴더 구조
+## 2. 폴더 구조와 화면 레이아웃
+
+데스크톱 웹 기준(platform: desktop). 모든 화면 위에 고정 헤더(로고 "FIRST-PENGUIN", 메뉴 "카드 추천"·"전체 카드"), 본문은 최대 1080px 컨테이너.
+/find·/result는 **왼쪽 본문 + 오른쪽 320px 고정 사이드바** 2단이고, 860px보다 좁으면 1단으로 바뀐다.
 
 ```
-app/
-  layout.tsx            공통 레이아웃 + FormProvider
-  globals.css           디자인 토큰(색·간격·반경), 기본 요소 스타일
-  page.tsx              /            첫 화면
-  find/page.tsx         /find        입력 (F2·F3·F8)
-  result/page.tsx       /result      추천 결과 (F4·F6 담기·F8)
-  compare/page.tsx      /compare     비교 표 (F6)
-  cards/page.tsx        /cards       전체 카드 (F7)
-  cards/[id]/page.tsx   /cards/:id   카드 상세 (F5, 없는 id → notFound())
-  not-found.tsx         404 화면
-  api/parse-spending/route.ts   F3 서버 API
-  %5F%5Fhealth/route.ts         GET /__health
-components/             화면 조각 (각자 .module.css)
-lib/
-  types.ts              Card, Benefit, FormState, Evaluation 등 타입
-  constants.ts          CATEGORIES, STATUSES, CARD_TYPES, sessionStorage 키
-  cards.ts              cards.json 로드·조회 (서버 전용)
-  recommend.ts          evaluate(), recommend(), compareWithCurrent() — 순수 함수
-  format.ts             won(), signedWon()
-  parse-spending.ts     AI 호출 + 규칙 기반 대체 추출
-data/cards.json
+src/
+  app/                          라우트(화면)만 둔다. 화면 로직은 components로
+    layout.tsx                  Header + FormProvider + Footer
+    page.tsx                    /            첫 화면(히어로 + 특징 3개)
+    find/page.tsx               /find        입력 (F2·F3·F8)
+    result/page.tsx             /result      추천 결과 (F4·F6 담기·F8)
+    compare/page.tsx            /compare     비교 표 (F6)
+    cards/page.tsx              /cards       전체 카드 (F7)
+    cards/[id]/page.tsx         /cards/:id   카드 상세 (F5, 없는 id → 404)
+    not-found.tsx               404 화면
+    api/parse-spending/route.ts F3 서버 API
+    %5F%5Fhealth/route.ts       GET /__health
+  components/
+    layout/   Header, Footer                      모든 화면 공통
+    ui/       Button(ButtonLink), Field(TextInput·Select), Panel, Badge   도메인 모르는 기본 부품
+    card/     CardVisual(카드 그림), CardRow(카드 한 줄), CardList(F7 목록·필터)
+    find/     FindForm(2단 + 입력 요약), ProfileFields(F2), SpendingFields(F2·F3), CurrentCardPicker(F8)
+    result/   ResultView(2단 + 내 입력·비교함), ResultCard(F4 한 장), CurrentSummary(F8 요약)
+    compare/  CompareTable(F6)
+  providers/  FormProvider        입력 상태(Context + sessionStorage)
+  lib/        types · constants · cards(데이터 로드) · recommend(계산, 순수 함수) · format · parse-spending(AI)
+  styles/     globals.css         디자인 토큰(색·간격·반경·그림자) + 공통 클래스(container, page, twoColumn, sticky)
+data/cards.json                   카드 데이터 (@data/* 별칭으로 import)
 ```
+
+규칙: 컴포넌트마다 같은 이름의 `.module.css`를 둔다. 색·간격은 globals.css의 CSS 변수만 쓴다. `ui/`는 카드·입력 같은 도메인을 모르게 둔다.
 
 ## 3. 데이터 타입
 
@@ -85,7 +92,7 @@ compareWithCurrent(top, current):  # F8, current는 거르기 없이 evaluate
 - 제목 "내 카드 찾기", 소개 2줄(금액 계산 추천 · 지금 카드와 비교)
 - 버튼 **내 카드 찾기** → /find, **전체 카드 보기** → /cards
 
-### /find 입력
+### /find 입력 (왼쪽: 내 정보 · 한 달 지출 · 지금 쓰는 카드 패널, 오른쪽: "입력 요약" + 추천 받기)
 | 요소 | 라벨/글자 | 규칙 |
 |---|---|---|
 | 선택 | 신분 | 대학생·군인·직장인·기타, 기본 "선택" |
@@ -100,7 +107,7 @@ compareWithCurrent(top, current):  # F8, current는 거르기 없이 evaluate
 오류 문구(위에서부터 첫 오류 하나): "신분을 골라 주세요" → "나이를 입력해 주세요" → "지출 금액을 하나 이상 입력해 주세요"
 F3 문구: "소비 내용을 적어 주세요" / "자동 채우기에 실패했어요. 직접 입력해 주세요" · F8 검색 결과 없음: "찾는 카드가 없어요"
 
-### /result 추천 결과
+### /result 추천 결과 (왼쪽: 지금 카드 요약 + 카드 3장, 오른쪽: "내 입력" + 다시 입력하기, "비교함" + 비교하기)
 - (F8) 맨 위 상자: "지금 카드: {이름} · 연간 순혜택 {n}원" + "1위 카드로 바꾸면 연 {n}원 더" 또는 "지금 카드가 가장 잘 맞아요. 바꾸지 않아도 돼요"
 - 카드 3장: "{순위}위", 이름(→ /cards/[id]), 카드사·종류, "예상 월 혜택 {n}원", "연간 순혜택 {n}원", "연회비 {n}원", 분야별 "{분야} 월 {n}원", 실적 미달이면 "실적 미달" 표시, (F8) "지금보다 연 +{n}원" / "−{n}원", 지금 카드면 "지금 쓰는 카드"
 - 버튼 **비교 담기** ↔ **담김**(다시 누르면 취소), 4번째 담기 시 "최대 3장까지 비교할 수 있어요"
