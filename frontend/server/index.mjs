@@ -2,7 +2,8 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { resolve, extname, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { attachRelay } from "./relay.mjs";
+// 딥 모드 중계는 백엔드의 연결 서버(posture-web/shared/relay.js)를 그대로 쓴다.
+import { attachRelay } from "../../posture-web/shared/relay.js";
 const root = fileURLToPath(new URL("../dist/", import.meta.url));
 const types = {
   ".html": "text/html; charset=utf-8",
@@ -11,6 +12,9 @@ const types = {
   ".svg": "image/svg+xml",
   ".wasm": "application/wasm",
   ".task": "application/octet-stream",
+  // 평가 빌드의 녹화 입력(/eval/)
+  ".webm": "video/webm",
+  ".json": "application/json; charset=utf-8",
 };
 const routes =
   /^\/(setup|watch|settings|history|connect|phone|report(?:\/[^/]+)?)?$/;

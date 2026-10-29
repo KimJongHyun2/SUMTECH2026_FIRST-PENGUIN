@@ -5,6 +5,7 @@ import { Icon } from "../components/ui/Icon";
 import { StatCard } from "../components/ui/StatCard";
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
+import { TestTools } from "../features/eval/TestTools";
 import { metricsFor, RECOGNITION_LABELS } from "../lib/posture";
 import { duration, percentage } from "../lib/format";
 export function WatchPage() {
@@ -144,6 +145,7 @@ export function WatchPage() {
       <p role="status" className="text-sm text-gray-400">
         {state.notice}
       </p>
+      <TestTools />
     </section>
   );
 }

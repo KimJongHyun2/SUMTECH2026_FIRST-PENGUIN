@@ -34,6 +34,10 @@ export interface Engine extends SessionRecord {
   beginRebaseline(t: number): EngineSignal[];
   setBaseline(t: number, id: string): EngineSignal[];
   applySettings(t: number, settings: Settings, id: string): EngineSignal[];
+  recognition: string;
+  // 평가 빌드 전용: 첫 자동 리포트 주기 가속과 테스트 입력 표시
+  accelerateFirstReport(t: number, seconds: number): EngineSignal[];
+  markTest(label: string): void;
   toJSON(): SessionRecord;
 }
 const Core = SessionEngine as unknown as {
@@ -50,8 +54,12 @@ export const createCollector = () =>
     graceSeconds: POLICY.recognitionGraceSeconds,
   });
 /** quality는 기준 등록 때의 배치와 다른 입력(뒤쪽의 다른 사람 등)까지 판정한다. */
-export const evaluate = (signals: Signals | null, baseline: Signals) =>
-  evaluateFrame(signals, baseline) as {
+export const evaluate = (
+  signals: Signals | null,
+  baseline: Signals,
+  sensitivity: Settings["sensitivity"],
+) =>
+  evaluateFrame(signals, baseline, sensitivity) as {
     quality: Quality;
     deviated: boolean;
     types: string[];

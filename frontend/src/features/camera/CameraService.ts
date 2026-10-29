@@ -11,6 +11,7 @@ import {
   sideAngle,
 } from "../../lib/posture";
 import type { Frame, Signals } from "../../lib/types";
+import type { RecordedSource } from "../eval/evalMode";
 
 export class CameraService {
   readonly video = document.createElement("video");
@@ -20,7 +21,11 @@ export class CameraService {
   private generation = 0;
   private timer?: ReturnType<typeof setInterval>;
   private lastFrame = -1;
-  constructor(private onFrame: (frame: Frame) => void) {
+  /** recorded: 평가 모드의 녹화 입력. 있으면 PC 정면 카메라 권한을 요청하지 않고 녹화 영상을 같은 경로로 판정한다. */
+  constructor(
+    private onFrame: (frame: Frame) => void,
+    private recorded: RecordedSource | null = null,
+  ) {
     this.video.muted = true;
     this.video.playsInline = true;
   }
@@ -28,20 +33,31 @@ export class CameraService {
   async start(side = false) {
     this.stop();
     const generation = this.generation;
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: side ? "environment" : "user",
-        width: { ideal: 640 },
-        height: { ideal: 480 },
-      },
-      audio: false,
-    });
-    if (generation !== this.generation) {
-      stream.getTracks().forEach((t) => t.stop());
-      throw new DOMException("취소됨", "AbortError");
+    if (this.recorded && !side) {
+      await this.recorded.start(this.video);
+      if (generation !== this.generation) {
+        this.recorded.stop();
+        throw new DOMException("취소됨", "AbortError");
+      }
+      this.stream = (
+        this.video as HTMLVideoElement & { captureStream(): MediaStream }
+      ).captureStream();
+    } else {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: side ? "environment" : "user",
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+        },
+        audio: false,
+      });
+      if (generation !== this.generation) {
+        stream.getTracks().forEach((t) => t.stop());
+        throw new DOMException("취소됨", "AbortError");
+      }
+      this.stream = stream;
+      this.video.srcObject = stream;
     }
-    this.stream = stream;
-    this.video.srcObject = stream;
     try {
       await this.video.play();
       const files = await FilesetResolver.forVisionTasks("/mediapipe/wasm");
@@ -101,13 +117,18 @@ export class CameraService {
           this.video.videoWidth,
           this.video.videoHeight,
         );
+        // 귀가 어깨보다 아래로 잡힌 각도(음수)는 측면 배치가 잘못된 입력으로 본다.
+        const valid =
+          s.ear_vis >= 0.5 &&
+          s.shoulder_vis >= 0.5 &&
+          s.angle_deg >= 0 &&
+          s.angle_deg <= 180;
         this.onFrame({
           ...invalid,
-          quality:
-            s.ear_vis >= 0.5 && s.shoulder_vis >= 0.5
-              ? "valid"
-              : "unrecognized",
-          angle: s.angle_deg,
+          quality: valid ? "valid" : "unrecognized",
+          angle: valid ? s.angle_deg : null,
+          earVis: s.ear_vis,
+          shoulderVis: s.shoulder_vis,
         });
       } else {
         const values = frontSignals(
@@ -139,6 +160,7 @@ export class CameraService {
     this.stream?.getTracks().forEach((t) => t.stop());
     this.stream = null;
     this.video.srcObject = null;
+    this.recorded?.stop();
   }
   dispose() {
     this.stop();

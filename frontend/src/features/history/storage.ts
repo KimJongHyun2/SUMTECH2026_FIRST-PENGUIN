@@ -1,7 +1,7 @@
 // 기록은 posture-web core의 IndexedDB 저장소(store.js)에 둔다. 화면은 메모리 사본(StoredData)을 읽는다.
 import { openStore } from "../../../../posture-web/src/core/store.js";
 import { compareSessions } from "../../../../posture-web/src/core/compare.js";
-import { DEFAULT_SETTINGS } from "../../lib/policy";
+import { DEFAULT_SETTINGS, withDefaults } from "../../lib/policy";
 import type {
   Baseline,
   Settings,
@@ -39,7 +39,7 @@ export async function loadData(factory: IDBFactory = indexedDB) {
     store.listSessions(),
   ]);
   const data: StoredData = {
-    settings: { ...DEFAULT_SETTINGS, ...version?.settings },
+    settings: withDefaults(version?.settings ?? {}),
     settingsId: version?.id ?? "default",
     baseline: baseline ?? null,
     sessions: sessions

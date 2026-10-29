@@ -6,7 +6,7 @@ import { PageHeading } from "../components/layout/PageHeading";
 import { Button } from "../components/ui/Button";
 import { Icon } from "../components/ui/Icon";
 import { CONNECTION_PILOT } from "../lib/policy";
-const QR_MS = CONNECTION_PILOT.qrExpirySeconds * 1000;
+import { TestTools } from "../features/eval/TestTools";
 const labels = {
   idle: "QR 코드를 생성해 주세요.",
   waiting: "QR을 스캔하고 휴대폰에서 연결 요청을 눌러 주세요.",
@@ -26,6 +26,11 @@ export function ConnectPage() {
     [error, setError] = useState(""),
     [placement, setPlacement] = useState(false);
   const qr = useRef<HTMLCanvasElement>(null);
+  // 연결 화면에 들어오면 QR을 바로 발급한다. QR 발급만으로는 촬영하지 않는다.
+  useEffect(() => {
+    if (controller.getSnapshot().connection === "idle")
+      controller.requestPairing("host");
+  }, [controller]);
   const [now, setNow] = useState(Date.now());
   const waiting = state.connection === "waiting" && !!state.token;
   useEffect(() => {
@@ -34,10 +39,7 @@ export function ConnectPage() {
     return () => clearInterval(timer);
   }, [waiting]);
   // 요청 전 만료는 PC에서도 바로 보여 준다. 실제 거부는 중계 서버가 요청·승인 때 검사한다.
-  const left = Math.max(
-    0,
-    Math.ceil((state.tokenIssuedAt + QR_MS - now) / 1000),
-  );
+  const left = Math.max(0, Math.ceil((state.tokenExpiresAt - now) / 1000));
   const connection = waiting && left === 0 ? "expired" : state.connection;
   useEffect(() => {
     if (!state.token || !qr.current || placement) return;
@@ -156,6 +158,7 @@ export function ConnectPage() {
       <p className="text-sm text-muted">
         영상은 전송하지 않고 측면 각도와 입력 품질만 전달해요.
       </p>
+      <TestTools />
     </section>
   );
 }

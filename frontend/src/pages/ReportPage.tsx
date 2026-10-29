@@ -57,6 +57,11 @@ export function ReportPage() {
         {state.stream ? "카메라 켜짐" : "카메라 꺼짐"} · {saved}
         {phoneStop}
       </p>
+      {!!session.testMarks?.length && (
+        <p className="text-sm font-bold text-warning">
+          테스트 표시: {session.testMarks.join(" · ")}
+        </p>
+      )}
       {session.validMs ? (
         <>
           <div className="grid grid-cols-3 gap-2 md:gap-6">

@@ -1,34 +1,27 @@
-// 정책값은 posture-web core(policy.js) 하나를 따른다. 민감도·소리는 화면 설정이고 판정 경계는 실측 후 정한다.
+// 정책값·설정 기본값·민감도 배율은 posture-web core(policy.js) 하나를 따른다. 민감도 경계는 실측 전 파일럿 값이다.
 import {
   POLICY as CORE_POLICY,
   CONNECTION_PILOT,
   DEFAULT_SETTINGS as CORE_DEFAULTS,
+  SENSITIVITY,
   WARNING_TEXT,
   POSITIVE_INTEGER_ERROR,
+  sameSettings as sameCore,
   validateSettings as validateCore,
+  withDefaults as withCoreDefaults,
 } from "../../../posture-web/src/core/policy.js";
 import type { Settings } from "./types";
-export { CONNECTION_PILOT, WARNING_TEXT };
+export { CONNECTION_PILOT, SENSITIVITY, WARNING_TEXT };
 export const POLICY = CORE_POLICY;
-export const DEFAULT_SETTINGS: Settings = {
-  ...CORE_DEFAULTS,
-  sensitivity: "normal",
-  sound: true,
-};
+export const DEFAULT_SETTINGS = CORE_DEFAULTS as Settings;
+/** 예전에 저장된 설정(시간 값만 있음)도 기본 민감도·소리로 채워 쓴다. */
+export const withDefaults = (settings: Partial<Settings>) =>
+  withCoreDefaults(settings) as Settings;
 export function validateSettings(input: Settings): string | null {
-  const { warningSeconds, rewarningSeconds } = input;
-  if (!validateCore({ warningSeconds, rewarningSeconds }).ok)
-    return POSITIVE_INTEGER_ERROR;
-  if (!["low", "normal", "high"].includes(input.sensitivity))
-    return "민감도를 선택해 주세요";
+  if (!validateCore(input).ok) return POSITIVE_INTEGER_ERROR;
+  if (!(input.sensitivity in SENSITIVITY)) return "민감도를 선택해 주세요";
   return null;
 }
-export const sameSettings = (a: Settings, b: Settings) =>
-  a.warningSeconds === b.warningSeconds &&
-  a.rewarningSeconds === b.rewarningSeconds &&
-  a.sensitivity === b.sensitivity &&
-  a.sound === b.sound;
-/** 경고 시간·재경고 간격이 바뀌면 진행 중 이탈을 설정 변경으로 닫고 새 구간을 시작한다. */
-export const changesJudgment = (a: Settings, b: Settings) =>
-  a.warningSeconds !== b.warningSeconds ||
-  a.rewarningSeconds !== b.rewarningSeconds;
+/** 같은 값 재적용은 새 버전·구간을 만들지 않는다. */
+export const sameSettings = (a: Settings, b: Settings): boolean =>
+  sameCore(a, b);

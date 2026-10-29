@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useSession } from "../app/SessionProvider";
 import { PageHeading } from "../components/layout/PageHeading";
 import { Button } from "../components/ui/Button";
+import { SENSITIVITY } from "../lib/policy";
 import type { Settings } from "../lib/types";
 export function SettingsPage() {
   const { state, controller } = useSession(),
@@ -27,7 +28,7 @@ export function SettingsPage() {
         <fieldset>
           <legend className="mb-4 text-muted">알림 민감도</legend>
           <div className="flex overflow-hidden rounded-xl border border-line">
-            {(["low", "normal", "high"] as const).map((value, index) => (
+            {(["low", "normal", "high"] as const).map((value) => (
               <label key={value} className="relative flex-1 text-center">
                 <input
                   className="peer sr-only"
@@ -38,7 +39,7 @@ export function SettingsPage() {
                   onChange={() => setDraft({ ...draft, sensitivity: value })}
                 />
                 <span className="block p-4 text-sm peer-checked:bg-primary-tint peer-checked:font-bold peer-focus-visible:ring-2 peer-focus-visible:ring-primary-strong">
-                  {["낮음", "보통", "높음"][index]}
+                  {SENSITIVITY[value].label}
                 </span>
               </label>
             ))}

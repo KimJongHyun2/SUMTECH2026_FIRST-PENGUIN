@@ -75,6 +75,8 @@ export interface SessionRecord {
   reports: Report[];
   segments: Segment[];
   settings: Settings;
+  // 평가 빌드에서 쓴 테스트 입력·주기 (운영 기록과 구분해 리포트에 표시)
+  testMarks?: string[];
 }
 export interface StoredData {
   settings: Settings;
@@ -87,4 +89,7 @@ export interface Frame {
   signals: Signals | null;
   angle: number | null;
   at: number;
+  // 휴대폰 측면 입력 품질(딥 모드 전송용)
+  earVis?: number;
+  shoulderVis?: number;
 }

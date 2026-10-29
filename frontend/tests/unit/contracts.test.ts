@@ -1,17 +1,20 @@
 import { createServer, type Server } from "node:http";
 import { IDBFactory } from "fake-indexeddb";
 import { afterEach, expect, test } from "vitest";
-import WebSocket from "ws";
 import { createCollector, createEngine } from "../../src/lib/posture";
 import {
   CONNECTION_PILOT,
   DEFAULT_SETTINGS,
-  changesJudgment,
   sameSettings,
   validateSettings,
+  withDefaults,
 } from "../../src/lib/policy";
 import { compareRecords, loadData } from "../../src/features/history/storage";
-import { attachRelay } from "../../server/relay.mjs";
+import {
+  PairingService,
+  type RelayMessage,
+} from "../../src/features/connection/PairingService";
+import { attachRelay } from "../../../posture-web/shared/relay.js";
 
 const sample = {
   head_forward: 0.4,
@@ -73,17 +76,21 @@ test("settings reject nonpositive values without arbitrary upper limit", () => {
     validateSettings({ ...DEFAULT_SETTINGS, warningSeconds: 301 }),
   ).toBeNull();
 });
-test("only a real change makes a new settings version, only timing closes deviation", () => {
+test("only a real change makes a new settings version, old settings get defaults", () => {
   expect(sameSettings(DEFAULT_SETTINGS, { ...DEFAULT_SETTINGS })).toBe(true);
-  const quiet = { ...DEFAULT_SETTINGS, sound: false };
-  expect(sameSettings(DEFAULT_SETTINGS, quiet)).toBe(false);
-  expect(changesJudgment(DEFAULT_SETTINGS, quiet)).toBe(false);
   expect(
-    changesJudgment(DEFAULT_SETTINGS, {
+    sameSettings(DEFAULT_SETTINGS, { ...DEFAULT_SETTINGS, sound: true }),
+  ).toBe(false);
+  expect(
+    sameSettings(DEFAULT_SETTINGS, {
       ...DEFAULT_SETTINGS,
-      warningSeconds: 12,
+      sensitivity: "high",
     }),
-  ).toBe(true);
+  ).toBe(false);
+  expect(withDefaults({ warningSeconds: 12, rewarningSeconds: 60 })).toEqual({
+    ...DEFAULT_SETTINGS,
+    warningSeconds: 12,
+  });
 });
 test("records survive reload in IndexedDB and missing storage is surfaced", async () => {
   const factory = new IDBFactory();
@@ -141,47 +148,80 @@ test("comparison needs enough records and the same condition", () => {
 });
 
 let server: Server | undefined;
-afterEach(() => server?.close());
-test("QR requests are refused after 120 seconds or once used", async () => {
-  let clock = 0;
+let relay: { close(): void } | undefined;
+const services: PairingService[] = [];
+afterEach(() => {
+  services.forEach((service) => service.close());
+  relay?.close();
+  server?.close();
+});
+test("PC and phone follow the backend deep-mode contract", async () => {
   server = createServer();
-  attachRelay(server, () => clock);
+  relay = attachRelay(server);
   await new Promise<void>((resolve) => server!.listen(0, resolve));
   const { port } = server.address() as { port: number };
-  const open = () =>
-    new Promise<WebSocket>((resolve) => {
-      const ws = new WebSocket(`ws://localhost:${port}/relay`, {
-        origin: `http://localhost:${port}`,
-      });
-      ws.on("open", () => resolve(ws));
-    });
-  const next = (ws: WebSocket) =>
-    new Promise<string>((resolve) =>
-      ws.once("message", (data) => resolve(JSON.parse(String(data)).type)),
+  const client = () => {
+    const inbox: RelayMessage[] = [];
+    const service = new PairingService(
+      (message) => inbox.push(message),
+      () => `ws://localhost:${port}`,
     );
-  const token = crypto.randomUUID();
-  const host = await open();
-  const ready = next(host);
-  host.send(JSON.stringify({ type: "host", token }));
-  expect(await ready).toBe("ready");
+    services.push(service);
+    const next = async (type: string) => {
+      for (let i = 0; i < 100; i++) {
+        const index = inbox.findIndex((m) => m.type === type);
+        if (index >= 0) return inbox.splice(index, 1)[0];
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      throw new Error(`${type} 메시지가 오지 않았어요`);
+    };
+    return { service, next };
+  };
 
-  clock = CONNECTION_PILOT.qrExpirySeconds * 1000;
-  const late = await open();
-  const refused = next(late);
-  late.send(JSON.stringify({ type: "join", token }));
-  expect(await refused).toBe("expired");
+  const pc = client();
+  pc.service.connect("pc", () => pc.service.send({ type: "qr.issue" }));
+  const issued = await pc.next("qr.issued");
+  expect(Number(issued.expiresAt) - Number(issued.issuedAt)).toBe(
+    CONNECTION_PILOT.qrExpirySeconds * 1000,
+  );
 
-  const fresh = crypto.randomUUID();
-  const host2 = await open();
-  host2.send(JSON.stringify({ type: "host", token: fresh }));
-  await next(host2);
-  const phone = await open();
-  const waiting = next(phone);
-  phone.send(JSON.stringify({ type: "join", token: fresh }));
-  expect(await waiting).toBe("waiting");
-  const other = await open();
-  const used = next(other);
-  other.send(JSON.stringify({ type: "join", token: fresh }));
-  expect(await used).toBe("used");
-  [host, host2, phone, other].forEach((ws) => ws.close());
+  const phone = client();
+  phone.service.connect("phone", () =>
+    phone.service.send({ type: "connect.request", token: issued.token }),
+  );
+  const requested = await pc.next("connect.requested");
+  await phone.next("connect.pending");
+
+  // 다른 휴대폰이 먼저 요청한 QR은 넘기지 않는다.
+  const other = client();
+  other.service.connect("phone", () =>
+    other.service.send({ type: "connect.request", token: issued.token }),
+  );
+  expect((await other.next("connect.rejected")).code).toBe("used");
+
+  pc.service.send({ type: "connect.approve", requestId: requested.requestId });
+  await pc.next("link.approved");
+  await phone.next("link.approved");
+
+  const t = phone.service.toServer(Date.now());
+  phone.service.send({
+    type: "side",
+    seq: 1,
+    t,
+    valid: true,
+    angleDeg: 80,
+    earVis: 0.9,
+    shoulderVis: 0.9,
+  });
+  const side = await pc.next("side");
+  expect([side.angleDeg, side.valid]).toEqual([80, true]);
+  expect(
+    Math.abs(pc.service.toLocal(Number(side.t)) - Date.now()),
+  ).toBeLessThan(1000);
+
+  pc.service.send({ type: "stop.request" });
+  const stop = await phone.next("stop.request");
+  phone.service.send({ type: "stop.done", stopId: stop.stopId });
+  await pc.next("stop.confirmed");
+  expect((await phone.next("link.closed")).reason).toBe("stopped");
 });

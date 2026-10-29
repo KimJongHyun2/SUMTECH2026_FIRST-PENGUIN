@@ -5,6 +5,7 @@ import { PageHeading } from "../components/layout/PageHeading";
 import { Button } from "../components/ui/Button";
 import { Icon } from "../components/ui/Icon";
 import { CameraPreview } from "../features/camera/CameraPreview";
+import { TestTools } from "../features/eval/TestTools";
 export function SetupPage() {
   const { state, controller } = useSession(),
     navigate = useNavigate();
@@ -49,6 +50,7 @@ export function SetupPage() {
             {state.error}
           </p>
         )}
+        <TestTools />
       </section>
     );
   const hint = state.collecting
@@ -99,13 +101,27 @@ export function SetupPage() {
             />
             카메라 배치와 앉은 자세를 확인했어요
           </label>
-          {state.mode === "deep" && (
-            <p>
-              {controller.remoteValid
-                ? "측면 입력이 유효해요"
-                : "측면 입력 대기"}
-            </p>
-          )}
+          {state.mode === "deep" &&
+            (state.connection === "approved" ? (
+              <p>
+                {controller.remoteValid
+                  ? "측면 입력이 유효해요"
+                  : "측면 입력 대기"}
+              </p>
+            ) : (
+              // 일시 정지·종료 요청이나 연결 유실로 휴대폰 연결이 끝나면 새 QR로 다시 연결한다.
+              <div className="grid gap-3">
+                <p>휴대폰 연결이 끝났어요.</p>
+                <Button
+                  onClick={() => {
+                    controller.reconnect();
+                    navigate("/connect");
+                  }}
+                >
+                  휴대폰 다시 연결
+                </Button>
+              </div>
+            ))}
         </div>
       </div>
       <div className="grid max-w-[840px] gap-4">
@@ -143,6 +159,7 @@ export function SetupPage() {
               : "탐지 시작"}
         </Button>
       </div>
+      <TestTools />
     </section>
   );
 }

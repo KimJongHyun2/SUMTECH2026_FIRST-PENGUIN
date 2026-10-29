@@ -17,6 +17,11 @@ export function Header({ home, dark }: { home: boolean; dark: boolean }) {
         />
         FAST TURTLE
       </Link>
+      {controller.eval && (
+        <span className="rounded-full bg-warning px-3 py-1 text-xs font-bold text-white">
+          평가 모드 · 녹화 입력
+        </span>
+      )}
       <nav className="flex items-center gap-3 text-sm md:gap-9">
         {home ? (
           <>
