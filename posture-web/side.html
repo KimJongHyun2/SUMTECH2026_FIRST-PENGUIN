@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>T2 옆모습 각도</title>
+</head>
+<body>
+  <h1>T2 옆모습 각도 <span class="status" id="relay">중계 연결 중...</span></h1>
+
+  <div class="row">
+    <select id="facing">
+      <option value="environment">후면 카메라</option>
+      <option value="user">전면 카메라</option>
+    </select>
+    <button class="primary" id="start">카메라 시작</button>
+    <span class="status" id="status">대기</span>
+  </div>
+
+  <div class="row">
+    <span class="big" id="angle">-</span>
+    <span class="status" id="avg"></span>
+  </div>
+
+  <div class="row">
+    <input id="participant" placeholder="참여자 (예: p1)" size="10" />
+    <input id="condition" placeholder="조건 (예: 50cm_책상)" size="14" />
+    <select id="label">
+      <option>정지_1분</option>
+      <option>바른자세</option>
+      <option>거북목_약</option>
+      <option>거북목_강</option>
+      <option>보정_연속</option>
+      <option>기타</option>
+    </select>
+  </div>
+
+  <div class="row">
+    <button id="record">기록 시작</button>
+    <button id="download">CSV 저장</button>
+    <button id="clear">기록 비우기</button>
+    <button id="snapshot">사진 저장</button>
+    <span class="status" id="count">0행</span>
+  </div>
+
+  <video id="video" playsinline muted></video>
+  <canvas id="overlay" width="640" height="480"></canvas>
+  <p class="status" id="meta"></p>
+
+  <p class="hint">
+    폰을 옆에 세우고 귀와 어깨가 보이게 맞춥니다. 각도는 귀가 어깨 바로 위일 때 90°이고, 머리가 앞으로 나올수록 작아집니다.
+    "사진 저장"은 표시 없는 원본 프레임을 저장하고, 파일명에 앱이 잰 각도를 넣습니다. 이 사진을 사진 수동 각도 측정 페이지에서 직접 재서 비교하세요.
+  </p>
+
+  <script type="module" src="/src/side.js"></script>
+</body>
+</html>

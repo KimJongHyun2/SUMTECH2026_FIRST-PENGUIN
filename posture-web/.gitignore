@@ -1,0 +1,7 @@
+node_modules/
+dist/
+data/
+results/
+.vitest/
+__pycache__/
+.pytest_cache/
