@@ -1,14 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { SessionEngine } from './engine.js';
-import { DEFAULT_SETTINGS } from './policy.js';
+import { DEFAULT_SETTINGS, POLICY } from './policy.js';
 
 const GOOD = { quality: 'valid', deviated: false };
 const BAD = { quality: 'valid', deviated: true, types: ['head_forward'] };
 const AWAY = { quality: 'away' };
 const STEP = 500;
+// 미채택 파일럿(짧은 가림 2초 유예). 기본 정책은 유예 없이 즉시 초기화한다.
+const GRACE_PILOT = { ...POLICY, recognitionGraceSeconds: 2 };
 
-function newEngine(settings = DEFAULT_SETTINGS) {
-  const engine = new SessionEngine({ id: 's1', startedAt: 0, baselineId: 'b1', settingsVersionId: 'c1', settings });
+function newEngine(settings = DEFAULT_SETTINGS, policy = POLICY) {
+  const engine = new SessionEngine({ id: 's1', startedAt: 0, baselineId: 'b1', settingsVersionId: 'c1', settings, policy });
   engine.start(0);
   return engine;
 }
@@ -95,8 +97,28 @@ describe('경고·복귀 (F2)', () => {
     expect(m.holds.map((h) => h.reason)).toEqual(['away']);
   });
 
-  it('짧은 가림(2초 이하)은 후보를 버리지 않고 이어서 센다 — 가린 시간은 유효 시간에 넣지 않는다', () => {
+  it('입력이 한 프레임만 무효여도 후보를 버리고 연속 타이머를 처음부터 다시 센다', () => {
     const engine = newEngine();
+    let r = feed(engine, 0, 8, BAD);
+    r = feed(engine, r.t, 0.5, AWAY);
+    expect(engine.candidateMs).toBe(0);
+    expect(engine.openHold).toMatchObject({ reason: 'away' });
+    r = feed(engine, r.t, 5, BAD);
+    expect(types(r.signals)).toEqual([]);
+    expect(engine.events).toHaveLength(0);
+  });
+
+  it('경고 중 한 프레임만 끊겨도 확정 이탈을 끊김 사유로 닫는다', () => {
+    const engine = newEngine();
+    let r = feed(engine, 0, 12, BAD);
+    r = feed(engine, r.t, 0.5, AWAY);
+    expect(types(r.signals)).toEqual(['clear']);
+    expect(engine.warningActive).toBe(false);
+    expect(engine.events[0].endReason).toBe('away');
+  });
+
+  it('파일럿 유예: 짧은 가림(2초 이하)은 후보를 버리지 않고 이어서 센다 — 가린 시간은 유효 시간에 넣지 않는다', () => {
+    const engine = newEngine(DEFAULT_SETTINGS, GRACE_PILOT);
     let r = feed(engine, 0, 8, BAD);
     r = feed(engine, r.t, 1.5, AWAY);
     expect(engine.candidateMs).toBe(8000);
@@ -107,8 +129,8 @@ describe('경고·복귀 (F2)', () => {
     expect(engine.holds).toHaveLength(0);
   });
 
-  it('짧은 가림은 확정 이탈도 닫지 않는다 (경고 중 안경 고쳐 쓰기)', () => {
-    const engine = newEngine();
+  it('파일럿 유예: 짧은 가림은 확정 이탈도 닫지 않는다 (경고 중 안경 고쳐 쓰기)', () => {
+    const engine = newEngine(DEFAULT_SETTINGS, GRACE_PILOT);
     let r = feed(engine, 0, 12, BAD);
     r = feed(engine, r.t, 2, AWAY);
     expect(types(r.signals)).toEqual([]);
@@ -118,8 +140,8 @@ describe('경고·복귀 (F2)', () => {
     expect(engine.events[0].endReason).toBe('normal_return');
   });
 
-  it('2초보다 길게 끊기면 후보를 버리고 보류 구간을 끊긴 시작 시각부터 남긴다', () => {
-    const engine = newEngine();
+  it('파일럿 유예: 2초보다 길게 끊기면 후보를 버리고 보류 구간을 끊긴 시작 시각부터 남긴다', () => {
+    const engine = newEngine(DEFAULT_SETTINGS, GRACE_PILOT);
     let r = feed(engine, 0, 8, BAD);
     const awayStart = r.t + STEP;
     r = feed(engine, r.t, 3, AWAY);
@@ -195,9 +217,72 @@ describe('세션 상태 (F3·F5·F1)', () => {
     engine.start(r.t);
     expect(engine.segments.map((s) => s.mode)).toEqual(['basic', 'deep', 'basic']);
   });
+
+  it('일시 정지 중에 딥 연결이 끊겨도 복구 대기로 바꾸고 장애를 남긴다 (F10)', () => {
+    const engine = newEngine();
+    engine.setMode(0, 'deep');
+    const r = feed(engine, 0, 3, GOOD);
+    engine.pause(r.t);
+    engine.enterRecovery(r.t + 1000);
+    expect(engine.state).toBe('recovering');
+    expect(engine.stops.map((s) => s.reason)).toEqual(['mode_change', 'paused', 'disconnected']);
+    engine.enterRecovery(r.t + 2000);
+    expect(engine.stops).toHaveLength(3);
+  });
+
+  it('측면 입력이 무효이면 전체 판정을 보류하고 그 사유를 남긴다 (F10)', () => {
+    const engine = newEngine();
+    engine.setMode(0, 'deep');
+    let r = feed(engine, 0, 12, BAD);
+    r = feed(engine, r.t, 0.5, { quality: 'side_stale' });
+    expect(engine.events[0].endReason).toBe('side_stale');
+    expect(engine.openHold).toMatchObject({ reason: 'side_stale' });
+    expect(engine.validMs).toBe(12000);
+  });
+
+  it('휴대폰 촬영 종료 요청과 확인 결과를 세션에 남긴다', () => {
+    const engine = newEngine();
+    engine.setPhoneStop(1000, 'requested');
+    engine.setPhoneStop(2000, 'unconfirmed', 'timeout');
+    expect(engine.phoneStop).toEqual({ status: 'unconfirmed', reason: 'timeout', at: 2000 });
+    expect(SessionEngine.fromJSON(JSON.parse(JSON.stringify(engine))).phoneStop.status).toBe('unconfirmed');
+  });
 });
 
 describe('리포트 (F6, docs/prd.md 4절)', () => {
+  it('자동 리포트 경계에서 난 경고 직후 바로 종료해도 종료 리포트에 집계된다', () => {
+    const engine = newEngine(DEFAULT_SETTINGS, { ...POLICY, reportValidSeconds: 10 });
+    const r = feed(engine, 0, 10, BAD);
+    expect(engine.warnings).toEqual([expect.objectContaining({ kind: 'first', valid: 10_000 })]);
+    expect(engine.reports[0].metrics.firstWarnings).toBe(0); // 자동 리포트는 [0, 10초)
+    engine.end(r.t);
+    const final = engine.reports.at(-1);
+    expect(final).toMatchObject({ kind: 'final', startValid: 10_000, endValid: 10_000 });
+    expect(final.metrics.firstWarnings).toBe(1);
+  });
+
+  it('경계 뒤 아무 일 없이 종료하면 빈 종료 리포트를 더 만들지 않는다', () => {
+    const engine = newEngine(DEFAULT_SETTINGS, { ...POLICY, reportValidSeconds: 10 });
+    const r = feed(engine, 0, 10, GOOD);
+    engine.end(r.t);
+    expect(engine.reports.map((x) => x.kind)).toEqual(['auto']);
+  });
+
+  it('경고 직후 바로 종료해도 종료 리포트에 최초 경고가 집계된다', () => {
+    const engine = newEngine();
+    let t = 0;
+    let warned = false;
+    while (!warned) {
+      t += STEP;
+      warned = engine.tick(t, BAD).some((s) => s.type === 'warning');
+    }
+    engine.end(t);
+    const report = engine.reports.at(-1);
+    expect(engine.warnings).toHaveLength(1);
+    expect(report.kind).toBe('final');
+    expect(report.metrics).toMatchObject({ newEvents: 1, firstWarnings: 1 });
+  });
+
   it('유효 1800초마다 자동 리포트를 만들고 세션은 계속, 종료 시 남은 구간만 부분 리포트 (S3)', () => {
     const engine = newEngine();
     let r = feed(engine, 0, 1800, GOOD);

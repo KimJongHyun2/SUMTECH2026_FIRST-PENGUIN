@@ -19,9 +19,27 @@ export class FrontCamera {
     this.label = '';
   }
 
+  /**
+   * 분석 모델을 불러오고 첫 추론까지 미리 끝낸다. 처음 한 번은 메인 스레드를 수 초 막을 수 있어서,
+   * 딥 모드는 연결 서버에 붙기 전에 불러 둔다(막힌 동안 heartbeat가 끊겨 연결 유실로 처리되지 않게).
+   */
+  async prepare() {
+    // 로딩 중에 다시 불러도(예: 자동 준비 중 '카메라 켜기') 같은 로딩을 기다린다. 모델을 두 벌 만들지 않는다.
+    this.loading ??= Promise.all([createPose('lite'), createFace()]).then((models) => {
+      warmUp(models);
+      return models;
+    });
+    try {
+      this.models = await this.loading;
+    } catch (error) {
+      this.loading = null; // 실패하면 다음 시도에서 다시 불러온다
+      throw error;
+    }
+  }
+
   /** 실패하면 브라우저 오류(NotAllowedError 등)나 EvalInputError를 그대로 던진다. */
   async start() {
-    this.models ??= await Promise.all([createPose('lite'), createFace()]);
+    await this.prepare();
     if (this.recorded) {
       await this.recorded.start(this.video);
       this.label = this.recorded.label;
@@ -96,6 +114,15 @@ export class FrontCamera {
     dot(POSE.L_SHOULDER, '#4f8fe4');
     dot(POSE.R_SHOULDER, '#4f8fe4');
   }
+}
+
+/** 빈 그림으로 한 번 추론해 모델 초기화(셰이더 준비 등)를 미리 끝낸다. */
+export function warmUp(tasks) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 64;
+  canvas.height = 64;
+  for (const task of tasks) task.detectForVideo(canvas, performance.now());
+  return true;
 }
 
 /** 화면에서 가장 넓게 보이는(가장 가까운) 얼굴의 번호. 없으면 -1 */

@@ -105,3 +105,12 @@ a { color: inherit; }
 .session-item { width: 100%; text-align: left; border-radius: 12px; }
 .test-tools { border: 2px dashed var(--muted); border-radius: 12px; padding: 12px; margin-top: 16px; }
 .confirm { border: 2px solid var(--error); border-radius: 12px; padding: 16px; margin: 12px 0; }
+
+.steps { padding-left: 1.4em; margin: 0 0 12px; }
+.steps li { margin: 2px 0; }
+.qr canvas { display: block; background: #fff; padding: 8px; border-radius: 12px; margin: 0 0 8px; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
+.phone-preview { width: 100%; max-width: 360px; border-radius: 12px; display: block; background: #000; margin: 0 0 12px; }
+/* 휴대폰 화면에는 PC 기록용 메뉴·안내를 보이지 않고, 저장소를 열지 않은 채 PC 화면으로 넘어가지 않게 한다 */
+.phone-view .top .muted, .phone-view footer { display: none; }
+.phone-view .top a { pointer-events: none; }

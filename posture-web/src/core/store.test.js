@@ -1,6 +1,7 @@
 import { IDBFactory } from 'fake-indexeddb';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { compareSessions, NOT_COMPARABLE, NOT_ENOUGH } from './compare.js';
+import { compareSessions, NOT_COMPARABLE, NOT_ENOUGH, sessionConditions } from './compare.js';
+import { MODEL_VERSION } from './detector.js';
 import { SessionEngine } from './engine.js';
 import { DEFAULT_SETTINGS } from './policy.js';
 import { openStore } from './store.js';
@@ -13,8 +14,12 @@ beforeEach(async () => {
 
 const baseline = (id, createdAt = 1) => ({ id, createdAt, features: { head_forward: 0.33, neck_len: 0.75, pitch_deg: 0 }, modelVersion: 'test', kind: 'front' });
 
-function finishedSession(id, { baselineId = 'b1', settingsVersionId = 'c1', goodSeconds = 10, badSeconds = 0 } = {}) {
-  const engine = new SessionEngine({ id, startedAt: 0, baselineId, settingsVersionId, settings: DEFAULT_SETTINGS });
+const CAMERA = { label: 'FaceTime HD Camera', width: 640, height: 480 };
+
+function finishedSession(id, {
+  baselineId = 'b1', settingsVersionId = 'c1', goodSeconds = 10, badSeconds = 0, conditions = sessionConditions(CAMERA),
+} = {}) {
+  const engine = new SessionEngine({ id, startedAt: 0, baselineId, settingsVersionId, settings: DEFAULT_SETTINGS, conditions });
   engine.start(0);
   let t = 0;
   for (; t < goodSeconds * 1000; t += 500) engine.tick(t + 500, { quality: 'valid', deviated: false });
@@ -116,6 +121,34 @@ describe('조건부 비교 (F7)', () => {
     const a = record(finishedSession('a', { baselineId: 'b1' }));
     const b = record(finishedSession('b', { baselineId: 'b2' }));
     expect(compareSessions(a, b)).toEqual({ comparable: false, message: NOT_COMPARABLE });
+  });
+
+  it('배치(카메라 장치·해상도)가 다르면 비교하지 않는다', () => {
+    const a = record(finishedSession('a'));
+    const b = record(finishedSession('b', { conditions: sessionConditions({ ...CAMERA, label: 'USB Webcam' }) }));
+    const c = record(finishedSession('c', { conditions: sessionConditions({ ...CAMERA, width: 1280, height: 720 }) }));
+    expect(compareSessions(a, b).message).toBe(NOT_COMPARABLE);
+    expect(compareSessions(a, c).message).toBe(NOT_COMPARABLE);
+  });
+
+  it('지표 조건(판정 경계·모델·집계 정의)이 다르면 비교하지 않는다', () => {
+    const base = sessionConditions(CAMERA);
+    const a = record(finishedSession('a'));
+    const b = record(finishedSession('b', { conditions: { ...base, metric: { ...base.metric, model: 'other-model' } } }));
+    expect(compareSessions(a, b).message).toBe(NOT_COMPARABLE);
+  });
+
+  it('비교 조건을 남기기 전의 기록은 같은 조건인지 확인할 수 없어 비교하지 않는다', () => {
+    const a = record(finishedSession('a'));
+    const old = record(finishedSession('b', { conditions: null }));
+    expect(compareSessions(a, old).message).toBe(NOT_COMPARABLE);
+  });
+
+  it('세션 조건은 지표(모델·판정 경계·집계 정의)와 배치(카메라)를 남긴다', () => {
+    const c = sessionConditions(CAMERA);
+    expect(c.metric.model).toBe(MODEL_VERSION);
+    expect(c.metric).toHaveProperty('limits');
+    expect(c.placement).toEqual({ camera: 'FaceTime HD Camera', width: 640, height: 480 });
   });
 
   it('같은 조건이면 이탈 비율 변화를 계산한다', () => {
