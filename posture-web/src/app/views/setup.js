@@ -3,10 +3,10 @@ import { BaselineCollector, MODEL_VERSION } from '../../core/detector.js';
 import { POLICY } from '../../core/policy.js';
 import { cameraErrorMessage } from '../camera.js';
 import { app, camera, newId, onLive, onView, placeCamera } from '../ctx.js';
-import { $, dateTime, show } from '../format.js';
+import { $, dateTime, percent, seconds, show } from '../format.js';
 import { startSession } from './watch.js';
 
-let sessionCount = 0;
+let saved = { sessions: 0, reports: 0, valid: 0, deviation: 0 };
 
 export function baselineRecord(features, now) {
   return {
@@ -46,6 +46,8 @@ export function beginRegistration(messageEl, onSaved) {
       if (result.status === 'collecting') {
         const done = Math.min(POLICY.baselineStableSeconds, Math.floor(result.progress * POLICY.baselineStableSeconds));
         messageEl.textContent = `안정된 자세를 유지해 주세요 (${done}/${POLICY.baselineStableSeconds}초)`;
+      } else if (result.status === 'paused') {
+        messageEl.textContent = '잠깐 가려졌어요. 다시 보이면 이어서 셀게요';
       } else if (result.status === 'restarted') {
         messageEl.textContent = '얼굴·어깨가 안정적으로 보일 때부터 5초를 다시 셀게요';
       }
@@ -83,8 +85,21 @@ $('setup-register').onclick = () => {
   beginRegistration($('setup-msg'));
 };
 
-$('setup-start').onclick = () => {
+// 버튼을 순간 입력 상태로 켰다 껐다 하면 누른 순간 꺼져 동작하지 않을 수 있다.
+// 그래서 버튼은 켜 두고, 누른 뒤 유효 입력(얼굴·어깨·같은 배치)이 확인되면 시작한다 (F3).
+let startPending = false;
+
+function tryStart() {
+  if (app.frame.quality !== 'valid') return false;
+  startPending = false;
   startSession(Date.now());
+  return true;
+}
+
+$('setup-start').onclick = () => {
+  if (tryStart()) return;
+  startPending = true;
+  $('setup-msg').textContent = '얼굴과 양쪽 어깨가 기준과 같은 자리에 보이면 바로 시작해요';
 };
 
 function baselineText() {
@@ -99,8 +114,21 @@ function placementText() {
 
 async function renderSetup() {
   if (app.storageError) $('setup-msg').textContent = app.storageError;
-  sessionCount = app.store ? (await app.store.listSessions()).length : 0;
+  const sessions = app.store ? await app.store.listSessions() : [];
+  const reports = sessions.flatMap((s) => s.engine.reports);
+  saved = {
+    sessions: sessions.length,
+    reports: reports.length,
+    valid: reports.reduce((a, r) => a + r.metrics.validSeconds, 0),
+    deviation: reports.reduce((a, r) => a + r.metrics.deviationSeconds, 0),
+  };
   liveSetup();
+}
+
+/** 유효 감지 기록이 없으면 비율을 0%로 쓰지 않고 계산 불가로 표시한다 (F6). */
+function analysisText() {
+  if (saved.valid === 0) return '분석 가능한 기록이 없습니다 (이탈 비율 계산 불가)';
+  return `유효 ${seconds(saved.valid)} 중 이탈 ${seconds(saved.deviation)} (${percent(saved.deviation / saved.valid)})`;
 }
 
 function liveSetup() {
@@ -109,13 +137,17 @@ function liveSetup() {
   $('setup-state').textContent = app.registration ? '기준 등록 중' : '준비';
   $('setup-camera').textContent = camera.on ? '켜짐' : '꺼짐';
   $('setup-baseline').textContent = baselineText();
-  $('setup-sessions').textContent = `${sessionCount}개`;
+  $('setup-sessions').textContent = `${saved.sessions}개`;
+  $('setup-reports').textContent = `${saved.reports}개`;
+  $('setup-analysis').textContent = analysisText();
   $('setup-placement').textContent = placementText();
   $('chk-face').classList.toggle('ok', camera.on && app.frame.faceFound);
   $('chk-shoulder').classList.toggle('ok', camera.on && app.frame.sample?.shoulder_vis >= 0.5);
   $('setup-register').disabled = !camera.on || Boolean(app.registration);
-  $('setup-start').disabled = !app.baseline || !camera.on || Boolean(app.registration)
-    || app.frame.quality !== 'valid' || active;
+  const canStart = Boolean(app.baseline) && camera.on && !app.registration && !active;
+  $('setup-start').disabled = !canStart;
+  if (!canStart) startPending = false;
+  else if (startPending) tryStart();
 }
 
 onView('/setup', renderSetup);

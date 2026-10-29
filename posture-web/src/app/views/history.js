@@ -50,6 +50,9 @@ function selectSession(id) {
     ['상태', SESSION_STATE_LABELS[selected.state]],
     ['리포트', `자동 ${auto}개 · 종료 ${reports.length - auto}개`],
     ['유효 감지 시간', seconds(sum(reports, 'validSeconds'))],
+    ['이탈 시간', seconds(sum(reports, 'deviationSeconds'))],
+    ['이탈 비율', percent(sum(reports, 'validSeconds') > 0
+      ? sum(reports, 'deviationSeconds') / sum(reports, 'validSeconds') : null)],
     ['확정 이탈', `${sum(reports, 'newEvents')}회`],
     ['최초 경고', `${sum(reports, 'firstWarnings')}회`],
     ['재경고', `${sum(reports, 'rewarnings')}회`],

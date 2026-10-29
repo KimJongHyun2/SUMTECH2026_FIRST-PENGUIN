@@ -36,17 +36,13 @@
       <h2>카메라 설정</h2>
       <p class="muted">평소처럼 화면을 보며 허리를 펴고 앉아 주세요. 얼굴과 양쪽 어깨가 보여야 해요.</p>
 
-      <dl class="facts" aria-label="저장 상태">
-        <div><dt>상태</dt><dd id="setup-state">준비</dd></div>
-        <div><dt>카메라</dt><dd id="setup-camera">꺼짐</dd></div>
-        <div><dt>저장된 기준</dt><dd id="setup-baseline">없음</dd></div>
-        <div><dt>저장된 세션</dt><dd id="setup-sessions">0개</dd></div>
-        <div><dt>현재 배치</dt><dd id="setup-placement">카메라를 켜서 확인이 필요해요</dd></div>
-      </dl>
-
+      <!-- 버튼은 계속 바뀌는 상태 문구보다 위에 두어, 누르는 순간 자리가 움직이지 않게 한다 -->
       <div class="actions">
         <button class="btn" id="setup-camera-on">카메라 켜기</button>
+        <button class="btn primary" id="setup-register" disabled>기준 자세 등록</button>
+        <button class="btn primary" id="setup-start" disabled>탐지 시작</button>
       </div>
+      <p id="setup-msg" class="status-line" aria-live="polite"></p>
       <p class="error" id="setup-camera-error" role="alert" hidden></p>
 
       <div class="cam-slot" id="setup-cam"></div>
@@ -55,27 +51,21 @@
         <li id="chk-shoulder">양쪽 어깨가 보여요</li>
       </ul>
 
-      <div class="actions">
-        <button class="btn primary" id="setup-register" disabled>기준 자세 등록</button>
-        <button class="btn primary" id="setup-start" disabled>탐지 시작</button>
-      </div>
-      <p id="setup-msg" class="status-line" aria-live="polite"></p>
+      <dl class="facts" aria-label="저장 상태">
+        <div><dt>상태</dt><dd id="setup-state">준비</dd></div>
+        <div><dt>카메라</dt><dd id="setup-camera">꺼짐</dd></div>
+        <div><dt>저장된 기준</dt><dd id="setup-baseline">없음</dd></div>
+        <div><dt>저장된 세션</dt><dd id="setup-sessions">0개</dd></div>
+        <div><dt>저장된 리포트</dt><dd id="setup-reports">0개</dd></div>
+        <div><dt>기록 분석</dt><dd id="setup-analysis">-</dd></div>
+        <div><dt>현재 배치</dt><dd id="setup-placement">카메라를 켜서 확인이 필요해요</dd></div>
+      </dl>
     </section>
 
     <!-- /watch 감지 화면 -->
     <section data-view="/watch" hidden>
       <div class="card">
-        <dl class="facts" aria-label="세션 상태">
-          <div><dt>세션 ID</dt><dd id="watch-session">-</dd></div>
-          <div><dt>상태</dt><dd id="watch-state">-</dd></div>
-          <div><dt>인식</dt><dd id="watch-recognition">-</dd></div>
-          <div><dt>모드</dt><dd id="watch-mode">기본</dd></div>
-          <div><dt>유효 감지 시간</dt><dd id="watch-valid">00:00</dd></div>
-          <div><dt>이탈 확인 중</dt><dd id="watch-candidate">-</dd></div>
-        </dl>
-        <p class="warning" id="watch-warning" role="alert" hidden></p>
-        <p class="notice" id="watch-report-ready" role="status" hidden>리포트가 준비됐어요</p>
-        <p class="status-line" id="watch-msg" aria-live="polite"></p>
+        <!-- 버튼은 경고·상태 문구보다 위에 두어, 경고가 나타나도 자리가 밀리지 않게 한다 -->
         <div class="actions" id="watch-controls">
           <button class="btn" id="watch-pause">일시 정지</button>
           <button class="btn" id="watch-resume" hidden>재개</button>
@@ -85,6 +75,18 @@
           <button class="btn danger" id="watch-end">세션 종료</button>
           <button class="btn" id="watch-basic" hidden>기본 모드로 계속</button>
         </div>
+        <p class="status-line" id="watch-msg" aria-live="polite"></p>
+        <p class="warning" id="watch-warning" role="alert" hidden></p>
+        <p class="notice" id="watch-report-ready" role="status" hidden>리포트가 준비됐어요</p>
+        <dl class="facts" aria-label="세션 상태">
+          <div><dt>세션 ID</dt><dd id="watch-session">-</dd></div>
+          <div><dt>상태</dt><dd id="watch-state">-</dd></div>
+          <div><dt>인식</dt><dd id="watch-recognition">-</dd></div>
+          <div><dt>모드</dt><dd id="watch-mode">기본</dd></div>
+          <div><dt>기준</dt><dd id="watch-baseline">-</dd></div>
+          <div><dt>유효 감지 시간</dt><dd id="watch-valid">00:00</dd></div>
+          <div><dt>이탈 확인 중</dt><dd id="watch-candidate">-</dd></div>
+        </dl>
       </div>
 
       <div class="card" id="settings-panel" hidden>
