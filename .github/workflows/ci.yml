@@ -1,0 +1,46 @@
+# 빌드·단위 테스트·문서 검사. 흐름 E2E는 scenarios.yml이 맡는다.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: posture-web
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+  analysis:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: posture-web
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - run: pip install pandas numpy scikit-learn matplotlib pytest
+      - run: python -m pytest analysis -q
+
+  planning-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: npm ci
+        working-directory: tools
+      - run: node tools/check-problem.mjs
+      - run: node tools/check-planning.mjs
