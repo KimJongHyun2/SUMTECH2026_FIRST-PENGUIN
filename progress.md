@@ -15,11 +15,11 @@ Agent가 서비스 저장소 루트의 `progress.md`로 복사해 이어 쓴다(
 - [x] 팀의 private 레포 생성 또는 기존 레포 확인 (학생이 직접 생성)
 - [x] loopthon-bot 앱을 팀 레포에 설치 (https://github.com/apps/loopthon-bot/installations/new, 팀 레포만 선택)
 - [x] 팀 코드로 대시보드 API 로그인(`data.teamId`), 레포 URL을 HTTP로 저장(`data.team.repoUrl`) 확인. 팀 코드로는 화면에 들어갈 수 없음
-- [ ] 사이트에 등록한 레포를 실제 작업 폴더로 clone, remote·기본 브랜치 확인
-- [ ] .gitignore / .env.example / README 준비(`.env`·`node_modules/`·`.next/`·`dist/`·`build/` 제외, 큰 데이터 파일 커밋 안 함. 파일이 너무 많으면 저장소를 읽지 못함)
-- [ ] 준비 파일 commit/push 확인
+- [x] 사이트에 등록한 레포를 실제 작업 폴더로 clone, remote·기본 브랜치 확인
+- [x] .gitignore / .env.example / README 준비(`.env`·`node_modules/`·`.next/`·`dist/`·`build/` 제외, 큰 데이터 파일 커밋 안 함. 파일이 너무 많으면 저장소를 읽지 못함)
+- [x] 준비 파일 commit/push 확인
 - [x] 앱 설치 후 읽기 권한 확인 (5분 자동 재확인, 즉시 확인은 같은 레포 URL 다시 저장)
-- 저장소 URL / 기본 브랜치 / commit SHA: https://github.com/KimJongHyun2/SUMTECH2026_FIRST-PENGUIN / main / (첫 push 전)
+- 저장소 URL / 기본 브랜치 / commit SHA: https://github.com/KimJongHyun2/SUMTECH2026_FIRST-PENGUIN / main / f76fc5f (첫 push 완료, 2026-10-29)
 - 사이트 등록 결과 / loopthon-bot 설치·접근 상태: teamId 18, repoUrl 저장 확인, check.result = ok (2026-10-29)
 
 ## 2. 문제정의 기록 → 문제 다지기 → 해법 찾기 → 기능 명세
