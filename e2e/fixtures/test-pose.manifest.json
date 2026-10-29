@@ -16,8 +16,8 @@
       "description": "바른 자세로 앉아 있기 (손으로 얼굴을 만지는 장면을 뺀 16초)",
       "verified": true,
       "inference": {
-        "frames": 25,
-        "valid": 25,
+        "frames": 28,
+        "valid": 28,
         "away": 0,
         "unrecognized": 0,
         "deviated": 0
@@ -30,11 +30,11 @@
       "description": "몸은 그대로, 머리를 화면 쪽으로 내민 채 유지 (20초)",
       "verified": true,
       "inference": {
-        "frames": 23,
-        "valid": 23,
+        "frames": 40,
+        "valid": 40,
         "away": 0,
         "unrecognized": 0,
-        "deviated": 23
+        "deviated": 38
       }
     },
     {
@@ -44,10 +44,10 @@
       "description": "자리를 비워 화면에 본인이 없음, 뒤쪽 다른 사람만 보임 (15초)",
       "verified": true,
       "inference": {
-        "frames": 18,
+        "frames": 33,
         "valid": 0,
-        "away": 15,
-        "unrecognized": 3,
+        "away": 33,
+        "unrecognized": 0,
         "deviated": 0
       }
     },
@@ -58,11 +58,11 @@
       "description": "바른 자세에서 손으로 안경·머리를 잠깐 만짐 (약 2초 가림 포함, 참고용)",
       "verified": true,
       "inference": {
-        "frames": 4,
-        "valid": 4,
-        "away": 0,
+        "frames": 6,
+        "valid": 5,
+        "away": 1,
         "unrecognized": 0,
-        "deviated": 1
+        "deviated": 0
       }
     }
   ],

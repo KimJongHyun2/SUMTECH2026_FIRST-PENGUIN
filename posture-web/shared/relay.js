@@ -107,7 +107,9 @@ export class ConnectionHub {
       this.#error(client, 'bad_message');
       return;
     }
-    const handler = (client.role === 'pc' ? this.#pcHandlers : this.#phoneHandlers)[msg.type];
+    // 처리기 객체가 직접 가진 이름만 인정한다. '__defineGetter__'·'constructor' 같은 상속 속성을 호출하면 서버가 죽는다.
+    const handlers = client.role === 'pc' ? this.#pcHandlers : this.#phoneHandlers;
+    const handler = Object.hasOwn(handlers, msg.type) ? handlers[msg.type] : null;
     if (msg.type === 'ping') this.#send(client, { type: 'pong', serverTime: t });
     else if (handler) handler.call(this, client, msg, t);
     else this.#error(client, 'bad_message');
@@ -300,33 +302,65 @@ export class ConnectionHub {
   }
 }
 
+/** Origin 헤더가 없거나(같은 사이트의 일반 요청) 같은 호스트일 때만 true. 'null'·잘못된 값은 다른 사이트로 본다. */
+function sameSite(origin, host) {
+  if (origin === undefined) return true;
+  try {
+    return new URL(origin).host === host;
+  } catch {
+    return false;
+  }
+}
+
+function reject(socket, status) {
+  socket.write(`HTTP/1.1 ${status}\r\nConnection: close\r\n\r\n`);
+  socket.destroy();
+}
+
 /**
  * HTTP 서버에 /relay WebSocket을 붙인다. role=pc|phone. 다른 사이트에서 연 페이지의 연결은 받지 않는다.
+ * 한 연결의 잘못된 입력으로 서버 프로세스가 끝나지 않도록, 처리 중 예외는 그 연결만 닫는다.
  * @returns {{ hub: ConnectionHub, close(): void }}
  */
-export function attachRelay(httpServer, { hub = new ConnectionHub() } = {}) {
+export function attachRelay(httpServer, { hub = new ConnectionHub(), log = console.error } = {}) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_MESSAGE_BYTES * 2 });
-  const timer = setInterval(() => hub.sweep(), SWEEP_MS);
+  const timer = setInterval(() => {
+    try {
+      hub.sweep();
+    } catch (error) {
+      log('relay sweep 실패', error.message);
+    }
+  }, SWEEP_MS);
   timer.unref?.();
 
   httpServer.on('upgrade', (req, socket, head) => {
-    const url = new URL(req.url, 'http://localhost');
+    let url;
+    try {
+      url = new URL(req.url, 'http://localhost');
+    } catch {
+      return reject(socket, '400 Bad Request');
+    }
     if (url.pathname !== '/relay') return; // 개발 서버의 HMR 연결은 건드리지 않는다
     const role = url.searchParams.get('role');
-    const origin = req.headers.origin;
-    const sameSite = !origin || new URL(origin).host === req.headers.host;
-    if ((role !== 'pc' && role !== 'phone') || !sameSite) {
-      socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
-      socket.destroy();
-      return;
+    if ((role !== 'pc' && role !== 'phone') || !sameSite(req.headers.origin, req.headers.host)) {
+      return reject(socket, '403 Forbidden');
     }
     wss.handleUpgrade(req, socket, head, (ws) => {
       const client = hub.connect({
         send: (message) => { if (ws.readyState === 1) ws.send(JSON.stringify(message)); },
         close: (code, reason) => ws.close(code, reason),
       }, role);
-      ws.on('message', (data, isBinary) => hub.receive(client, isBinary ? null : data.toString()));
-      ws.on('close', () => hub.disconnect(client, 'closed'));
+      // 토큰·메시지 내용은 기록하지 않는다.
+      const guard = (fn) => (...args) => {
+        try {
+          fn(...args);
+        } catch (error) {
+          log('relay 메시지 처리 실패', error.message);
+          ws.close(1011, 'internal_error');
+        }
+      };
+      ws.on('message', guard((data, isBinary) => hub.receive(client, isBinary ? null : data.toString())));
+      ws.on('close', guard(() => hub.disconnect(client, 'closed')));
       ws.on('error', () => ws.terminate());
     });
   });
