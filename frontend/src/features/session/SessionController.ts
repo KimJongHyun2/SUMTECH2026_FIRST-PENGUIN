@@ -374,7 +374,10 @@ export class SessionController {
     this.update({
       collecting: true,
       progress: 0,
-      notice: "5초 동안 편안하게 자세를 유지해 주세요.",
+      notice:
+        this.state.mode === "deep"
+          ? "정면·측면 모두 5초 동안 편안하게 자세를 유지해 주세요."
+          : "5초 동안 편안하게 자세를 유지해 주세요.",
     });
   };
   /** 딥 모드는 정면·측면이 같은 5초 동안 함께 안정해야 하는 양쪽 기준 수집기를 쓴다. */
@@ -563,7 +566,10 @@ export class SessionController {
         this.state = {
           ...this.state,
           collecting: false,
-          notice: "기준 자세가 등록됐어요.",
+          notice:
+            mode === "deep"
+              ? "정면·측면 양쪽 기준이 등록됐어요."
+              : "기준 자세가 등록됐어요.",
         };
         void this.persist((store) => store.addBaseline(baseline));
         void this.save();

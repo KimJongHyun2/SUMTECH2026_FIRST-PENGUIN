@@ -5,6 +5,7 @@ import { PageHeading } from "../components/layout/PageHeading";
 import { Button } from "../components/ui/Button";
 import { Icon } from "../components/ui/Icon";
 import { CameraPreview } from "../features/camera/CameraPreview";
+import { SidePreview } from "../features/camera/SidePreview";
 import { TestTools } from "../features/eval/TestTools";
 export function SetupPage() {
   const { state, controller } = useSession(),
@@ -53,6 +54,7 @@ export function SetupPage() {
         <TestTools />
       </section>
     );
+  const deep = state.mode === "deep";
   const hint = state.collecting
     ? state.notice
     : !state.confirmed
@@ -62,20 +64,44 @@ export function SetupPage() {
         : state.frame?.quality !== "valid"
           ? "얼굴과 양쪽 어깨가 보이도록 카메라 배치를 조정해 주세요."
           : controller.canBegin
-            ? "기준 자세가 등록됐어요. 탐지 시작 버튼을 눌러 주세요."
-            : "준비됐어요. 기준 자세 등록 버튼을 누르고 5초 동안 자세를 유지해 주세요.";
+            ? deep
+              ? "정면·측면 양쪽 기준이 등록됐어요. 딥 모드 탐지 시작 버튼을 눌러 주세요."
+              : "기준 자세가 등록됐어요. 탐지 시작 버튼을 눌러 주세요."
+            : deep
+              ? "준비됐어요. 기준 자세 등록 버튼을 누르고 정면·측면 모두 5초 동안 자세를 유지해 주세요."
+              : "준비됐어요. 기준 자세 등록 버튼을 누르고 5초 동안 자세를 유지해 주세요.";
   return (
     <section className="space-y-10 pt-14">
       <PageHeading
         title="기준 자세를 등록해주세요"
         description={
-          "카메라에 얼굴과 어깨가 보이도록 앉아 주세요.\n안정된 입력을 연속 5초 유지하면 개인 기준이 설정됩니다."
+          deep
+            ? "정면·측면 양쪽 기준을 함께 등록해요.\n두 카메라 모두 안정된 입력을 같은 5초 동안 유지하면 기준이 설정됩니다."
+            : "카메라에 얼굴과 어깨가 보이도록 앉아 주세요.\n안정된 입력을 연속 5초 유지하면 개인 기준이 설정됩니다."
         }
       />
       <div className="flex flex-col items-start gap-8 lg:flex-row lg:gap-14">
-        <div className="w-full max-w-[630px]">
-          <CameraPreview guide />
-        </div>
+        {deep ? (
+          // 딥 모드: 정면과 휴대폰 측면 영상을 나란히 보며 양쪽 기준을 함께 등록한다.
+          <div className="grid w-full max-w-[1100px] gap-4 md:grid-cols-2">
+            <figure className="grid gap-2">
+              <figcaption className="text-sm font-bold">
+                정면 · PC 카메라
+              </figcaption>
+              <CameraPreview guide />
+            </figure>
+            <figure className="grid gap-2">
+              <figcaption className="text-sm font-bold">
+                측면 · 휴대폰 카메라
+              </figcaption>
+              <SidePreview />
+            </figure>
+          </div>
+        ) : (
+          <div className="w-full max-w-[630px]">
+            <CameraPreview guide />
+          </div>
+        )}
         <div className="grid gap-7 text-sm md:text-base">
           {[
             ["얼굴과 귀가 보여요", (state.frame?.signals?.ear_vis ?? 0) >= 0.5],
