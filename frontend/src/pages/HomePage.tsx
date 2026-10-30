@@ -43,13 +43,11 @@ export function HomePage() {
             딥 모드 사용하기
           </Button>
         </div>
-        <div
-          className="flex min-h-60 min-w-0 items-center justify-center rounded-[20px] bg-[#dde2df] p-8 text-center text-sm text-[#58625c] lg:aspect-[1007/590]"
-          role="img"
-          aria-label="학습 이미지 준비 영역"
-        >
-          노트북으로 공부하는 학생 이미지 준비 중
-        </div>
+        <img
+          src="/images/home-hero.png"
+          alt="책상에서 노트북으로 공부하는 학생"
+          className="w-full min-w-0 rounded-[20px] object-cover lg:aspect-[1007/590]"
+        />
       </section>
       <section
         id="features"
