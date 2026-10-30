@@ -49,6 +49,13 @@ export function PhonePage() {
         >
           {state.cameraStatus === "loading" ? "준비 중…" : "카메라 켜기"}
         </Button>
+        {state.cameraStatus === "on" && (
+          <Button onClick={controller.switchCamera}>
+            {state.phoneFacing === "environment"
+              ? "전면 카메라로 전환"
+              : "후면 카메라로 전환"}
+          </Button>
+        )}
         <Button onClick={controller.releasePairing}>연결 종료</Button>
       </div>
       {state.cameraStatus === "on" && <CameraPreview />}

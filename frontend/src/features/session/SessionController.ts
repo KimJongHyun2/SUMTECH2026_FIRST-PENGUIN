@@ -82,6 +82,8 @@ export interface SessionState {
   remote: { quality: string; angle: number | null; at: number } | null;
   // 딥 모드 PC: 휴대폰에서 받은 측면 영상(화면 표시용, 저장하지 않음)
   sideStream: MediaStream | null;
+  // 휴대폰 측면 카메라 방향(후면 기본, 전면 전환 가능)
+  phoneFacing: "environment" | "user";
   phoneStop: "none" | "requested" | "confirmed" | "unconfirmed";
   testStatus: string;
 }
@@ -139,6 +141,7 @@ export class SessionController {
       tokenExpiresAt: 0,
       remote: null,
       sideStream: null,
+      phoneFacing: "environment",
       phoneStop: "none",
       testStatus: "",
     };
@@ -271,7 +274,10 @@ export class SessionController {
     const request = ++this.cameraRequest;
     this.update({ cameraStatus: "loading", error: "" });
     try {
-      await this.camera.start(this.phone);
+      await this.camera.start(
+        this.phone,
+        this.phone ? this.state.phoneFacing : undefined,
+      );
       if (request !== this.cameraRequest) return;
       this.lastFrameAt = 0;
       this.update({
@@ -300,6 +306,15 @@ export class SessionController {
         }`,
       });
     }
+  };
+  /** 휴대폰: 전면·후면 카메라를 바꿔 다시 켠다. 다시 켜면서 PC로 가는 측면 영상도 새 카메라로 바뀐다. */
+  switchCamera = () => {
+    if (!this.phone || this.state.cameraStatus !== "on") return;
+    this.update({
+      phoneFacing:
+        this.state.phoneFacing === "environment" ? "user" : "environment",
+    });
+    void this.openCamera();
   };
   get remoteValid() {
     return (

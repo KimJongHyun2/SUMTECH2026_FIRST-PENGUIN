@@ -7,6 +7,7 @@ import { Button } from "../components/ui/Button";
 import { Icon } from "../components/ui/Icon";
 import { CONNECTION_PILOT } from "../lib/policy";
 import { TestTools } from "../features/eval/TestTools";
+import { SidePreview } from "../features/camera/SidePreview";
 const labels = {
   idle: "QR 코드를 생성해 주세요.",
   waiting: "QR을 스캔하고 휴대폰에서 연결 요청을 눌러 주세요.",
@@ -58,8 +59,9 @@ export function ConnectPage() {
           centered
         />
         <div className="flex w-full max-w-[950px] flex-col items-center gap-10 md:flex-row">
-          <div className="flex min-h-[300px] flex-1 items-center justify-center rounded-[20px] bg-[#dde2df] p-10 text-center text-muted md:h-[494px]">
-            책상 옆에 휴대폰을 고정하고 측면을 촬영해 주세요.
+          {/* 휴대폰 측면 영상을 보며 배치를 맞춘다. */}
+          <div className="w-full flex-1">
+            <SidePreview />
           </div>
           <ul className="space-y-7">
             {["귀와 어깨가 함께 보이게", "사용 중 위치가 바뀌지 않게"].map(

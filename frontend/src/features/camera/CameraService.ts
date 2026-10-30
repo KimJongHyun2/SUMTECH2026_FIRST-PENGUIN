@@ -30,7 +30,8 @@ export class CameraService {
     this.video.playsInline = true;
   }
 
-  async start(side = false) {
+  /** facing: 휴대폰 측면 카메라의 방향. 없으면 휴대폰은 후면, PC는 전면을 쓴다. */
+  async start(side = false, facing?: "user" | "environment") {
     this.stop();
     const generation = this.generation;
     if (this.recorded && !side) {
@@ -45,7 +46,7 @@ export class CameraService {
     } else {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: side ? "environment" : "user",
+          facingMode: facing ?? (side ? "environment" : "user"),
           width: { ideal: 640 },
           height: { ideal: 480 },
         },
