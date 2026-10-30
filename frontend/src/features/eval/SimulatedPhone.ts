@@ -7,7 +7,7 @@ import {
 } from "../connection/PairingService";
 import type { Clip } from "./evalMode";
 
-// 모의 측면 각도(도). 판정은 기준 대비 10도 넘게 작아지면 이탈로 본다.
+// 모의 측면 각도(도). 판정(deep.js)은 기준 대비 15°×민감도 배율 이상 작아지면 이탈로 본다.
 const ANGLES: Record<Exclude<Clip, "away">, number> = { good: 80, turtle: 60 };
 const SEND_EVERY_MS = 250;
 

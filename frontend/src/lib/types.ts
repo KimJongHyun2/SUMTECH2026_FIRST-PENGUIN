@@ -1,5 +1,12 @@
 export type Mode = "basic" | "deep";
-export type Quality = "valid" | "away" | "unrecognized" | "none";
+export type Quality =
+  | "valid"
+  | "away"
+  | "unrecognized"
+  | "none"
+  // 딥 모드 측면 입력 지연·인식 불가 (판정 보류 사유)
+  | "side_stale"
+  | "side_unrecognized";
 export interface Settings {
   sensitivity: "low" | "normal" | "high";
   warningSeconds: number;

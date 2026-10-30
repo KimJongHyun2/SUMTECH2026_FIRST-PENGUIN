@@ -16,7 +16,11 @@ import { SimulatedPhone } from "../eval/SimulatedPhone";
 import {
   createEngine,
   createCollector,
+  createDeepCollector,
   evaluate,
+  fuse,
+  sideInputQuality,
+  type Collector,
   type Engine,
   type EngineSignal,
 } from "../../lib/posture";
@@ -49,6 +53,16 @@ const SIDE_SYNC_MS = CONNECTION_PILOT.sideMaxAgeSeconds * 1000;
 const SIDE_LOST_MS = CONNECTION_PILOT.disconnectSeconds * 1000;
 // 평가 전용 '[테스트용] 리포트 3초 가속'의 첫 자동 주기(유효 시간, 초)
 const ACCEL_SECONDS = 3;
+// 기준 등록을 다시 셀 때의 안내. 사유는 deep.js의 양쪽 기준 수집기가 알려 준다(posture-web 화면과 같은 문구).
+const RESTART_TEXT: Record<string, string> = {
+  front: "얼굴·어깨가 안정적으로 보일 때부터 5초를 다시 셀게요.",
+  side_stale:
+    "측면 입력이 끊겨 5초를 다시 셀게요. 휴대폰 연결과 촬영을 확인해 주세요.",
+  side_unrecognized:
+    "휴대폰이 귀·어깨를 찾지 못해 5초를 다시 셀게요. 옆모습이 보이게 휴대폰을 놓아 주세요.",
+  side_unstable:
+    "옆모습이 흔들려 5초를 다시 셀게요. 편하게 앉아 움직이지 말아 주세요.",
+};
 
 export type Connection =
   | "idle"
@@ -93,8 +107,7 @@ export class SessionController {
   private readonly sideVideo: SideVideoLink;
   private listeners = new Set<() => void>();
   private engine: Engine | null = null;
-  private collector = createCollector();
-  private sideSamples: number[] = [];
+  private collector: Collector = createCollector();
   private store: RecordStore | null = null;
   private writes: Promise<unknown>;
   private pendingWrites = 0;
@@ -356,8 +369,7 @@ export class SessionController {
   register = () => {
     if (!this.canRegister) return;
     if (this.engine) this.handle(this.engine.beginRebaseline(Date.now()));
-    this.collector = createCollector();
-    this.sideSamples = [];
+    this.collector = this.newCollector();
     this.setData({ baseline: null });
     this.update({
       collecting: true,
@@ -365,6 +377,12 @@ export class SessionController {
       notice: "5초 동안 편안하게 자세를 유지해 주세요.",
     });
   };
+  /** 딥 모드는 정면·측면이 같은 5초 동안 함께 안정해야 하는 양쪽 기준 수집기를 쓴다. */
+  private newCollector() {
+    return this.state.mode === "deep"
+      ? createDeepCollector()
+      : createCollector();
+  }
   begin = () => {
     if (!this.canBegin) return false;
     const { data, mode } = this.state;
@@ -479,64 +497,64 @@ export class SessionController {
       return;
     }
     const { mode, data } = this.state;
-    // 측면 입력은 정면 입력과 측정 시각 차이가 허용 오차(파일럿 1초) 안일 때만 결합한다.
+    // 측면 입력 품질은 판정 코드(deep.js)의 규칙을 따른다: 없음·정면과 1초 넘게 차이·갱신 중단은 side_stale,
+    // 휴대폰이 귀·어깨를 찾지 못하면 side_unrecognized. 시각은 모두 이 기기 기준으로 맞춘 값이다.
     const remote = this.state.remote;
-    const sideOK =
-      mode !== "deep" ||
-      (this.state.connection === "approved" &&
-        remote?.quality === "valid" &&
-        Math.abs(frame.at - remote.at) <= SIDE_SYNC_MS);
+    const sideQ = sideInputQuality(
+      this.state.connection === "approved" && remote
+        ? { t: remote.at, valid: remote.quality === "valid" }
+        : null,
+      frame.at,
+      { idle: remote?.quality === "stale", maxAgeMs: SIDE_SYNC_MS },
+    );
+    const side = remote?.angle != null ? { angleDeg: remote.angle } : null;
     const interrupted =
       !!this.lastFrameAt && frame.at - this.lastFrameAt > 2000;
     const running = this.engine?.state === "running" && !!data.baseline;
     // 판정 중에는 기준 등록 때와 같은 배치인지도 확인한다.
-    const judged =
+    const sensitivity = withDefaults(
+      this.engine?.settings ?? data.settings,
+    ).sensitivity;
+    let judged =
       running && frame.quality === "valid"
-        ? evaluate(
-            frame.signals,
-            data.baseline!.signals,
-            withDefaults(this.engine!.settings).sensitivity,
-          )
+        ? evaluate(frame.signals, data.baseline!.signals, sensitivity)
         : null;
     const frontQuality = judged?.quality ?? frame.quality;
-    const quality = sideOK ? frontQuality : "unrecognized";
+    // 딥 모드는 유효하고 동기화된 두 입력만 결합하고, 한쪽이라도 무효이면 그 사유로 판정을 보류한다.
+    if (judged && mode === "deep")
+      judged = fuse(judged, sideQ, side, data.baseline!.sideAngle, sensitivity);
+    const quality =
+      judged?.quality ??
+      (mode === "deep" && frontQuality === "valid" ? sideQ : frontQuality);
     this.state = {
       ...this.state,
       frame: { ...frame, quality },
       frontValid: frontQuality === "valid",
     };
     if (this.state.collecting) {
-      if (interrupted) {
-        this.collector = createCollector();
-        this.sideSamples = [];
-      }
-      let sample = quality === "valid" ? frame.signals : null;
-      const angle = this.state.remote?.angle;
-      if (mode === "deep" && this.sideSamples.length && angle != null) {
-        const mean =
-          this.sideSamples.reduce((a, b) => a + b, 0) / this.sideSamples.length;
-        if (Math.abs(mean - angle) > 5) sample = null; // 파일럿 안정성 기준, 실기기 검증 필요
-      }
-      const result = this.collector.push(frame.at, sample);
-      if (result.status === "restarted") this.sideSamples = [];
-      else if (mode === "deep" && angle != null) this.sideSamples.push(angle);
+      if (interrupted) this.collector = this.newCollector();
+      const result = this.collector.push(
+        frame.at,
+        frontQuality === "valid" ? frame.signals : null,
+        sideQ,
+        side,
+      );
       this.state = {
         ...this.state,
         progress: result.progress,
         notice:
           result.status === "restarted"
-            ? "입력이나 자세가 바뀌어 다시 5초를 확인해요."
+            ? RESTART_TEXT[result.reason ?? "front"]
             : "안정된 입력을 확인하고 있어요.",
       };
       if (result.status === "done") {
+        // 딥 모드 기준은 정면 특징과 측면 평균 각도를 함께 담는다.
+        const { side_angle_deg, ...signals } = result.baseline!;
         const baseline = {
           id: crypto.randomUUID(),
           mode,
-          signals: result.baseline as Signals,
-          sideAngle: this.sideSamples.length
-            ? this.sideSamples.reduce((a, b) => a + b, 0) /
-              this.sideSamples.length
-            : null,
+          signals: signals as Signals,
+          sideAngle: mode === "deep" ? (side_angle_deg ?? null) : null,
           createdAt: frame.at,
         };
         this.setData({ baseline });
@@ -568,16 +586,6 @@ export class SessionController {
         deviated: quality === "valid" && !!judged?.deviated,
         types: [...(judged?.types ?? [])],
       };
-      if (
-        mode === "deep" &&
-        quality === "valid" &&
-        data.baseline.sideAngle != null &&
-        this.state.remote?.angle != null &&
-        data.baseline.sideAngle - this.state.remote.angle > 10
-      ) {
-        result.deviated = true;
-        result.types.push("side_angle");
-      }
       this.handle(this.engine.tick(frame.at, result));
       if (this.replay?.status === "running") {
         this.replay.tick(frame.at, this.engine);
@@ -747,10 +755,10 @@ export class SessionController {
         });
         break;
       case "link.input-idle":
-        // 측면 입력 갱신 중단: 연결은 유지하되 판정은 보류한다.
+        // 측면 입력 갱신 중단: 연결은 유지하되 '측면 입력 지연'으로 판정을 보류한다.
         if (this.state.remote)
           this.update({
-            remote: { ...this.state.remote, quality: "unrecognized" },
+            remote: { ...this.state.remote, quality: "stale" },
           });
         break;
       case "stop.requested":

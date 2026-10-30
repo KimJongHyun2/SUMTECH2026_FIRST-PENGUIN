@@ -38,7 +38,11 @@ export function WatchPage() {
       : "판정이 멈춰 있어요"
     : !valid
       ? RECOGNITION_LABELS[
-          state.frame?.quality === "away" ? "away" : "unrecognized"
+          state.frame?.quality === "away" ||
+          state.frame?.quality === "side_stale" ||
+          state.frame?.quality === "side_unrecognized"
+            ? state.frame.quality
+            : "unrecognized"
         ]
       : openEvent
         ? "기준 자세를 확인해 주세요"

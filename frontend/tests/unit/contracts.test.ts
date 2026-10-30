@@ -1,7 +1,12 @@
 import { createServer, type Server } from "node:http";
 import { IDBFactory } from "fake-indexeddb";
 import { afterEach, expect, test } from "vitest";
-import { createCollector, createEngine } from "../../src/lib/posture";
+import {
+  createCollector,
+  createDeepCollector,
+  createEngine,
+  fuse,
+} from "../../src/lib/posture";
 import {
   CONNECTION_PILOT,
   DEFAULT_SETTINGS,
@@ -43,6 +48,47 @@ test("registration restarts on the first missing frame with the default policy",
   expect(collector.push(9000, sample).status).toBe("collecting");
   expect(collector.push(10000, sample).status).toBe("done");
 });
+// 딥 모드는 판정 코드(deep.js)의 경계를 그대로 쓴다: 측면 각도가 기준보다 15°×민감도 배율 이상 줄면 이탈.
+test("deep judgment uses the core side-angle limit and sensitivity", () => {
+  const front = { quality: "valid" as const, deviated: false, types: [] };
+  expect(fuse(front, "valid", { angleDeg: 70 }, 80, "normal").deviated).toBe(
+    false,
+  );
+  expect(fuse(front, "valid", { angleDeg: 65 }, 80, "normal")).toEqual({
+    quality: "valid",
+    deviated: true,
+    types: ["side_angle"],
+  });
+  // 높음(×0.7)은 10.5°, 낮음(×1.5)은 22.5°부터 이탈이다.
+  expect(fuse(front, "valid", { angleDeg: 69 }, 80, "high").deviated).toBe(
+    true,
+  );
+  expect(fuse(front, "valid", { angleDeg: 60 }, 80, "low").deviated).toBe(
+    false,
+  );
+  expect(fuse(front, "side_stale", null, 80, "normal").quality).toBe(
+    "side_stale",
+  );
+});
+
+// 양쪽 기준은 정면·측면이 같은 5초 동안 함께 안정해야 하고, 한쪽이 깨지면 둘 다 처음부터 다시 센다.
+test("deep registration needs front and side stable for the same five seconds", () => {
+  const collector = createDeepCollector();
+  collector.push(0, sample, "valid", { angleDeg: 80 });
+  expect(
+    collector.push(2000, sample, "side_unrecognized", null),
+  ).toMatchObject({ status: "restarted", reason: "side_unrecognized" });
+  collector.push(3000, sample, "valid", { angleDeg: 80 });
+  expect(
+    collector.push(4000, sample, "valid", { angleDeg: 89 }),
+  ).toMatchObject({ status: "restarted", reason: "side_unstable" });
+  for (let t = 5000; t < 10000; t += 1000)
+    collector.push(t, sample, "valid", { angleDeg: 79 + ((t / 1000) % 3) });
+  const done = collector.push(10000, sample, "valid", { angleDeg: 80 });
+  expect(done.status).toBe("done");
+  expect(done.baseline?.side_angle_deg).toBeCloseTo(80, 0);
+});
+
 test("warning at ten seconds and paused time excluded", () => {
   const e = newEngine();
   e.start(0);

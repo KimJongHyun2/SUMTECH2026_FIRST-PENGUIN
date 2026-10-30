@@ -6,6 +6,11 @@ import {
   frameQuality,
 } from "../../../posture-web/src/core/detector.js";
 import { windowMetrics } from "../../../posture-web/src/core/report.js";
+import {
+  DeepBaselineCollector,
+  fuseDeep,
+  sideQuality,
+} from "../../../posture-web/src/core/deep.js";
 import type {
   SessionRecord,
   Settings,
@@ -48,11 +53,47 @@ export const createEngine = (options: Record<string, unknown>) =>
   new Core({ ...options, policy: POLICY });
 export const restoreEngine = (data: SessionRecord) =>
   Core.fromJSON(data, POLICY);
+export type SideQuality = "valid" | "side_stale" | "side_unrecognized";
+export type SideInput = { angleDeg: number } | null;
+export type Judged = { quality: Quality; deviated: boolean; types: string[] };
+/** 기준 등록 수집 결과. 다시 셀 때 reason은 'front'|'side_stale'|'side_unrecognized'|'side_unstable'이다. */
+export type CollectResult = {
+  status: "collecting" | "paused" | "restarted" | "done";
+  progress: number;
+  reason?: string;
+  baseline?: Signals & { side_angle_deg?: number };
+};
+export type Collector = {
+  push(
+    t: number,
+    front: Signals | null,
+    sideQ?: SideQuality,
+    side?: SideInput,
+  ): CollectResult;
+};
+const collectorOptions = () => ({
+  seconds: POLICY.baselineStableSeconds,
+  graceSeconds: POLICY.recognitionGraceSeconds,
+});
 export const createCollector = () =>
-  new BaselineCollector({
-    seconds: POLICY.baselineStableSeconds,
-    graceSeconds: POLICY.recognitionGraceSeconds,
-  });
+  new BaselineCollector(collectorOptions()) as unknown as Collector;
+/** 딥 모드 양쪽 기준: 정면·측면이 같은 5초 동안 함께 안정해야 한다(deep.js). */
+export const createDeepCollector = () =>
+  new DeepBaselineCollector(collectorOptions()) as unknown as Collector;
+/** 측면 입력을 정면 입력 시각에 결합할 수 있는지(deep.js와 같은 규칙). 시각은 이 기기 기준으로 맞춘 값이다. */
+export const sideInputQuality = (
+  side: { t: number; valid: boolean } | null,
+  frontTime: number,
+  options: { idle: boolean; maxAgeMs: number },
+) => sideQuality(side, frontTime, options) as SideQuality;
+/** 정면 판정에 측면 입력을 더한다(deep.js). 측면 각도가 기준보다 15°×민감도 배율 이상 줄면 이탈이다. */
+export const fuse = (
+  front: Judged,
+  sideQ: SideQuality,
+  side: SideInput,
+  baselineAngle: number | null,
+  sensitivity: Settings["sensitivity"],
+) => fuseDeep(front, sideQ, side, baselineAngle, sensitivity) as Judged;
 /** quality는 기준 등록 때의 배치와 다른 입력(뒤쪽의 다른 사람 등)까지 판정한다. */
 export const evaluate = (
   signals: Signals | null,
