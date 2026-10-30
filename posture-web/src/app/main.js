@@ -21,9 +21,15 @@ const SMOOTH_FRAMES = 3;
 function startTicker() {
   const src = `setInterval(() => postMessage(Date.now()), ${TICK_MS});`;
   const worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+  let nextTickAt = 0;
   worker.onmessage = (event) => {
-    if (Date.now() - event.data > TICK_MS) return;
+    const startedAt = Date.now();
+    if (startedAt - event.data > TICK_MS || startedAt < nextTickAt) return;
     tick();
+    const finishedAt = Date.now();
+    // 추론이 주기보다 느리면 한 주기를 비워 측면 입력·heartbeat·클릭을 처리할 시간을 준다.
+    // 오래된 입력을 유효로 바꾸거나 등록의 연속성 조건을 완화하지 않는다.
+    if (finishedAt - startedAt > TICK_MS) nextTickAt = finishedAt + TICK_MS;
   };
 }
 

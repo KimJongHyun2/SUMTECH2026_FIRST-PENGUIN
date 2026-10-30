@@ -112,7 +112,7 @@ export const REPLAYS = {
     name: '정면 이탈·복귀 재생',
     steps: [
       { clip: 'turtle', label: '이탈 10초', done: (s) => s.warningActive },
-      { clip: 'good', label: '복귀 3초', done: (s) => !s.warningActive },
+      { clip: 'good', label: '복귀 3초', recovery: true, done: (s) => !s.warningActive },
     ],
   },
   // 딥 모드: 정면 녹화 구간과 측면 모의 각도를 함께 바꾼다(측면은 MockPhone.lean).
@@ -120,7 +120,7 @@ export const REPLAYS = {
     name: '양쪽 이탈·복귀 재생',
     steps: [
       { clip: 'turtle', label: '양쪽 이탈 10초', done: (s) => s.warningActive },
-      { clip: 'good', label: '양쪽 복귀 3초', done: (s) => !s.warningActive },
+      { clip: 'good', label: '양쪽 복귀 3초', recovery: true, done: (s) => !s.warningActive },
     ],
   },
   away: {
@@ -129,7 +129,7 @@ export const REPLAYS = {
       { clip: 'turtle', label: '이탈 6초', done: (s) => s.candidateMs >= 6000 },
       { clip: 'away', label: '자리 비움 5초', awayMs: 5000 },
       { clip: 'turtle', label: '새 이탈 10초', done: (s) => s.warningActive },
-      { clip: 'good', label: '복귀 3초', done: (s) => !s.warningActive },
+      { clip: 'good', label: '복귀 3초', recovery: true, done: (s) => !s.warningActive },
     ],
   },
 };
@@ -148,7 +148,7 @@ export class Replay {
     return `${this.plan.name} 중: ${this.plan.steps[this.index]?.label ?? ''}`;
   }
 
-  #next(now) {
+  #next(now, session) {
     this.index += 1;
     const step = this.plan.steps[this.index];
     if (!step) {
@@ -157,6 +157,8 @@ export class Replay {
     }
     this.stepSince = now;
     this.awaySince = null;
+    // 경고 해제는 정상 복귀 외에 입력 장애로도 발생한다. 복귀 단계의 이탈 ID를 추적한다.
+    this.recoveryEventId = step.recovery ? session.episode?.id : null;
     this.show(step.clip);
   }
 
@@ -169,18 +171,26 @@ export class Replay {
       return;
     }
     if (this.index < 0) {
-      this.#next(now);
+      this.#next(now, session);
       return;
     }
     const step = this.plan.steps[this.index];
     let done;
-    if (step.awayMs) {
+    if (step.recovery) {
+      const event = session.events.find((item) => item.id === this.recoveryEventId);
+      done = event?.endReason === 'normal_return';
+      if (event?.endReason && !done) {
+        this.status = 'failed';
+        this.reason = '정상 복귀 전에 입력이 중단됐어요';
+        return;
+      }
+    } else if (step.awayMs) {
       if (session.recognition === 'away') this.awaySince ??= now;
       done = this.awaySince !== null && now - this.awaySince >= step.awayMs;
     } else {
       done = step.done(session);
     }
-    if (done) this.#next(now);
+    if (done) this.#next(now, session);
     else if (now - this.stepSince > STEP_TIMEOUT_MS) {
       this.status = 'failed';
       this.reason = `${step.label} 입력이 판정되지 않았어요`;
