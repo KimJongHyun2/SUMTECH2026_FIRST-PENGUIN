@@ -78,6 +78,12 @@ export function App() {
           !
         </div>
         <p className="text-center leading-relaxed text-muted">{WARNING_TEXT}</p>
+        {/* Figma 06 경고 화면의 측면 앉은 자세 일러스트 */}
+        <img
+          src="/images/warning-posture.png"
+          alt="노트북 앞에 앉아 등과 목을 펴는 측면 자세 일러스트"
+          className="mx-auto mt-6 w-[360px] max-w-full"
+        />
         <div className="mt-8 flex justify-center gap-3">
           <Button onClick={controller.dismissWarning}>확인했어요</Button>
           <Button
