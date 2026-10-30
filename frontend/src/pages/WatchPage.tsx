@@ -61,7 +61,9 @@ export function WatchPage() {
   const cameraText = state.stream ? "카메라 켜짐" : "카메라 꺼짐";
   return (
     <section className="space-y-6 pt-7">
-      <div className="grid overflow-hidden rounded-[22px] bg-night-card lg:grid-cols-[780fr_1012fr]">
+      <div
+        className={`grid overflow-hidden rounded-[22px] bg-night-card ${state.mode === "deep" ? "lg:grid-cols-2" : "lg:grid-cols-[780fr_1012fr]"}`}
+      >
         <div className="flex items-center bg-[#2e3538]">
           <CameraPreview />
         </div>
