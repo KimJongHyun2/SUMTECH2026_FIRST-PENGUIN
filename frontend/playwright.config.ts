@@ -6,14 +6,14 @@ export default defineConfig({
   timeout: 45000,
   use: {
     baseURL: `http://localhost:${port}`,
-    channel: "chrome",
+    ...(process.env.CI ? {} : { channel: "chrome" }),
     headless: true,
   },
   // 평가 빌드로 띄운다. 평가 모드는 첫 주소가 /?mode=eval일 때만 켜지므로 다른 시험에는 영향이 없다.
   webServer: {
     command: `npm run dev -- --port ${port}`,
     url: `http://localhost:${port}`,
-    reuseExistingServer: true,
+    reuseExistingServer: !process.env.CI,
     env: { EVAL_ENABLED: "true" },
   },
 });

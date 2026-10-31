@@ -6,6 +6,31 @@ on:
   pull_request:
 
 jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm test
+      # build에 TypeScript 검사와 모델·WASM 준비가 포함된다.
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:ui -- tests/ui/app.spec.ts --forbid-only
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: frontend-test-results
+          path: frontend/test-results
+
   web:
     runs-on: ubuntu-latest
     defaults:
