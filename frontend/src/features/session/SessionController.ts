@@ -3,7 +3,10 @@ import {
   PairingService,
   type RelayMessage,
 } from "../connection/PairingService";
-import { SideVideoLink } from "../connection/SideVideoLink";
+import {
+  SideVideoLink,
+  type SideVideoStatus,
+} from "../connection/SideVideoLink";
 import { loadData, freshData, type RecordStore } from "../history/storage";
 import {
   EVAL,
@@ -98,6 +101,7 @@ export interface SessionState {
   sideStream: MediaStream | null;
   // 휴대폰 측면 카메라 방향(후면 기본, 전면 전환 가능)
   phoneFacing: "environment" | "user";
+  sideVideoStatus: SideVideoStatus;
   phoneStop: "none" | "requested" | "confirmed" | "unconfirmed";
   testStatus: string;
 }
@@ -155,6 +159,7 @@ export class SessionController {
       remote: null,
       sideStream: null,
       phoneFacing: "environment",
+      sideVideoStatus: "idle",
       phoneStop: "none",
       testStatus: "",
     };
@@ -168,6 +173,7 @@ export class SessionController {
     this.sideVideo = new SideVideoLink(
       (message) => this.pairing.send(message),
       (sideStream) => this.update({ sideStream }),
+      (sideVideoStatus) => this.update({ sideVideoStatus }),
     );
     // 휴대폰에는 개인 기록을 저장하지 않는다.
     this.writes = phone ? Promise.resolve() : this.load();

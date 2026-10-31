@@ -27,11 +27,13 @@ export function ConnectPage() {
     [error, setError] = useState(""),
     [placement, setPlacement] = useState(false);
   const qr = useRef<HTMLCanvasElement>(null);
-  // 연결 화면에 들어오면 QR을 바로 발급한다. QR 발급만으로는 촬영하지 않는다.
+  // 같은 화면에서 재연결해도 배치 안내를 닫고 새 QR을 발급한다.
   useEffect(() => {
-    if (controller.getSnapshot().connection === "idle")
+    if (state.connection === "idle") {
+      setPlacement(false);
       controller.requestPairing("host");
-  }, [controller]);
+    }
+  }, [controller, state.connection]);
   const [now, setNow] = useState(Date.now());
   const waiting = state.connection === "waiting" && !!state.token;
   useEffect(() => {

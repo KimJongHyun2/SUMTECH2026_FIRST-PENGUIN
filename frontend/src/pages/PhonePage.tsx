@@ -59,6 +59,12 @@ export function PhonePage() {
         <Button onClick={controller.releasePairing}>연결 종료</Button>
       </div>
       {state.cameraStatus === "on" && <CameraPreview />}
+      {state.sideVideoStatus === "failed" && (
+        <p role="alert" className="text-sm text-gray-400">
+          PC로 측면 영상을 보내지 못했어요. 두 기기의 네트워크를 확인하고 PC의
+          새 QR로 다시 연결해 주세요. 측면 각도 입력은 계속 전송해요.
+        </p>
+      )}
       <p role="status" className="text-sm text-gray-400">
         {state.error || state.notice}
       </p>
