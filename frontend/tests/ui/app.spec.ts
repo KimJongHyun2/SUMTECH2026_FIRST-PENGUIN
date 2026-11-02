@@ -75,74 +75,122 @@ test("synthetic camera registration, monitoring and stopping tracks", async ({
   ).toBe(true);
 });
 
-for (const stage of ["배치 안내", "측정 화면"]) {
-  test(`${stage}에서 측면 영상 실패를 표시하고 새 QR로 재연결한다`, async ({
-    page,
-    context,
-  }) => {
-    // 영상 미리보기 실패와 측면 각도 입력의 판정 경로를 분리해 검증한다.
-    await context.route("**/src/features/camera/CameraService.ts", (route) =>
-      route.fulfill({
-        contentType: "application/javascript",
-        body: `
+for (const stage of ["배치 안내", "측정 화면", "영상 재생"]) {
+  test(
+    stage === "영상 재생"
+      ? "측면 영상 재생 실패를 안내하고 다시 재생한다"
+      : `${stage}에서 측면 영상 실패를 표시하고 새 QR로 재연결한다`,
+    async ({ page, context }) => {
+      // 영상 미리보기 실패와 측면 각도 입력의 판정 경로를 분리해 검증한다.
+      await context.route("**/src/features/camera/CameraService.ts", (route) =>
+        route.fulfill({
+          contentType: "application/javascript",
+          body: `
 export class CameraService {
  constructor(callback){this.callback=callback;this.stream=null;}
- async start(){const canvas=document.createElement('canvas');canvas.width=640;canvas.height=480;this.stream=canvas.captureStream(10);this.timer=setInterval(()=>this.callback({quality:'valid',signals:{head_forward:.4,neck_len:.4,ear_vis:1,shoulder_vis:1,pitch_deg:0},angle:78,earVis:.9,shoulderVis:.9,at:Date.now()}),250);}
+ async start(){
+ const canvas=document.createElement('canvas');canvas.width=640;canvas.height=480;
+ const paint=canvas.getContext('2d');this.stream=canvas.captureStream(10);
+ this.timer=setInterval(()=>{
+ paint.fillStyle='rgb('+(Date.now()%255)+',0,0)';paint.fillRect(0,0,640,480);
+ this.callback({quality:'valid',signals:{head_forward:.4,neck_len:.4,ear_vis:1,shoulder_vis:1,pitch_deg:0},angle:78,earVis:.9,shoulderVis:.9,at:Date.now()});
+ },250);
+ }
  stop(){clearInterval(this.timer);this.stream?.getTracks().forEach(t=>t.stop());this.stream=null;}
  dispose(){this.stop();}
 }`,
-      }),
-    );
-    // PC에서 WebRTC를 사용할 수 없어도 승인·각도 입력·복구 UI는 동작해야 한다.
-    await page.addInitScript(() => {
-      Object.defineProperty(window, "RTCPeerConnection", { value: undefined });
-    });
-    const issuedTokens: string[] = [];
-    const qr = new Promise<string>((resolve) => {
-      page.on("websocket", (socket) => {
-        socket.on("framereceived", ({ payload }) => {
-          const message = JSON.parse(String(payload));
-          if (message.type === "qr.issued") {
-            issuedTokens.push(message.token);
-            resolve(message.token);
-          }
+        }),
+      );
+      if (stage === "영상 재생") {
+        // 실제 중계·WebRTC 연결은 유지하고 브라우저의 첫 재생 요청 거부만 재현한다.
+        await page.addInitScript(() => {
+          const play = HTMLMediaElement.prototype.play;
+          let rejectFirstSidePlay = true;
+          HTMLMediaElement.prototype.play = function () {
+            if (
+              this.getAttribute("aria-label") === "휴대폰 측면 영상" &&
+              rejectFirstSidePlay
+            ) {
+              rejectFirstSidePlay = false;
+              return Promise.reject(
+                new DOMException("재생 요청 거부", "NotAllowedError"),
+              );
+            }
+            return play.call(this);
+          };
+        });
+      } else {
+        // PC에서 WebRTC를 사용할 수 없어도 승인·각도 입력·복구 UI는 동작해야 한다.
+        await page.addInitScript(() => {
+          Object.defineProperty(window, "RTCPeerConnection", {
+            value: undefined,
+          });
+        });
+      }
+      const issuedTokens: string[] = [];
+      const qr = new Promise<string>((resolve) => {
+        page.on("websocket", (socket) => {
+          socket.on("framereceived", ({ payload }) => {
+            const message = JSON.parse(String(payload));
+            if (message.type === "qr.issued") {
+              issuedTokens.push(message.token);
+              resolve(message.token);
+            }
+          });
         });
       });
-    });
-    await page.goto("/");
-    await page.getByRole("button", { name: "딥 모드 사용하기" }).click();
-    const phone = await context.newPage();
-    await phone.goto(`/phone#${await qr}`);
-    await phone.getByRole("button", { name: "연결 요청", exact: true }).click();
-    await page.getByRole("button", { name: "연결 승인" }).click();
-    await expect(phone.getByText("연결이 완료되었어요!")).toBeVisible();
-    await phone.getByRole("button", { name: "카메라 켜기" }).click();
-    await page.getByRole("button", { name: "측면 배치 안내" }).click();
-    if (stage === "측정 화면") {
-      await page.getByRole("button", { name: "확인했어요" }).click();
-      await page.getByRole("button", { name: "카메라 켜기" }).click();
-      await page.getByRole("checkbox").check();
-      const register = page.getByRole("button", {
-        name: "기준 자세 등록",
-        exact: true,
-      });
-      await expect(register).toBeEnabled();
-      await register.click();
-      const begin = page.getByRole("button", {
-        name: "딥 모드 탐지 시작",
-        exact: true,
-      });
-      await expect(begin).toBeEnabled({ timeout: 15000 });
-      await begin.click();
-    }
-    const alert = page.getByRole("alert");
-    await expect(alert).toContainText("측면 영상을 불러오지 못했어요");
-    await alert.getByRole("button", { name: "휴대폰 다시 연결" }).click();
-    await expect(page).toHaveURL(/\/connect$/);
-    await expect(page.getByLabel("휴대폰 연결 QR")).toBeVisible();
-    await expect.poll(() => issuedTokens.length).toBe(2);
-    expect(issuedTokens[1]).not.toBe(issuedTokens[0]);
-    await expect(phone.getByText("연결이 완료되었어요!")).toHaveCount(0);
-    await phone.close();
-  });
+      await page.goto("/");
+      await page.getByRole("button", { name: "딥 모드 사용하기" }).click();
+      const phone = await context.newPage();
+      await phone.goto(`/phone#${await qr}`);
+      await phone
+        .getByRole("button", { name: "연결 요청", exact: true })
+        .click();
+      await page.getByRole("button", { name: "연결 승인" }).click();
+      await expect(phone.getByText("연결이 완료되었어요!")).toBeVisible();
+      await phone.getByRole("button", { name: "카메라 켜기" }).click();
+      await page.getByRole("button", { name: "측면 배치 안내" }).click();
+      if (stage === "영상 재생") {
+        const alert = page.getByRole("alert");
+        await expect(alert).toContainText("측면 영상을 재생하지 못했어요", {
+          timeout: 15000,
+        });
+        await alert.getByRole("button", { name: "영상 다시 재생" }).click();
+        await expect(alert).toHaveCount(0);
+        await expect(
+          page.getByText("측면 입력이 유효해요", { exact: true }),
+        ).toBeVisible();
+        await expect(phone.getByText("연결이 완료되었어요!")).toBeVisible();
+        expect(issuedTokens).toHaveLength(1);
+        await phone.close();
+        return;
+      }
+      if (stage === "측정 화면") {
+        await page.getByRole("button", { name: "확인했어요" }).click();
+        await page.getByRole("button", { name: "카메라 켜기" }).click();
+        await page.getByRole("checkbox").check();
+        const register = page.getByRole("button", {
+          name: "기준 자세 등록",
+          exact: true,
+        });
+        await expect(register).toBeEnabled();
+        await register.click();
+        const begin = page.getByRole("button", {
+          name: "딥 모드 탐지 시작",
+          exact: true,
+        });
+        await expect(begin).toBeEnabled({ timeout: 15000 });
+        await begin.click();
+      }
+      const alert = page.getByRole("alert");
+      await expect(alert).toContainText("측면 영상을 불러오지 못했어요");
+      await alert.getByRole("button", { name: "휴대폰 다시 연결" }).click();
+      await expect(page).toHaveURL(/\/connect$/);
+      await expect(page.getByLabel("휴대폰 연결 QR")).toBeVisible();
+      await expect.poll(() => issuedTokens.length).toBe(2);
+      expect(issuedTokens[1]).not.toBe(issuedTokens[0]);
+      await expect(phone.getByText("연결이 완료되었어요!")).toHaveCount(0);
+      await phone.close();
+    },
+  );
 }
