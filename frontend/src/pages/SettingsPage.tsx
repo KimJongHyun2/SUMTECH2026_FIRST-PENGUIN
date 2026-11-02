@@ -3,9 +3,23 @@ import { useNavigate } from "react-router-dom";
 import { useSession } from "../app/SessionProvider";
 import { PageHeading } from "../components/layout/PageHeading";
 import { Button } from "../components/ui/Button";
+import { EmptyState } from "../components/ui/EmptyState";
 import { SENSITIVITY } from "../lib/policy";
 import type { Settings } from "../lib/types";
 export function SettingsPage() {
+  const { state } = useSession();
+  if (!state.loaded)
+    return (
+      <section className="pt-12">
+        <PageHeading title="설정" />
+        <EmptyState>저장한 설정을 불러오고 있어요.</EmptyState>
+      </section>
+    );
+  return <SettingsForm />;
+}
+
+// 저장소를 읽은 뒤 폼을 처음 만들어 기본값이 저장된 설정을 덮어쓰지 않게 한다.
+function SettingsForm() {
   const { state, controller } = useSession(),
     navigate = useNavigate();
   const [draft, setDraft] = useState<Settings>({ ...state.data.settings }),
