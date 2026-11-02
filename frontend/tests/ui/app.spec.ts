@@ -33,6 +33,52 @@ test("routes, validation and mobile layout", async ({ page }) => {
   await page.screenshot({ path: "test-results/mobile.png", fullPage: true });
   expect(errors).toEqual([]);
 });
+
+test("설정 화면을 새로 열어도 저장한 알림 설정을 복원한다", async ({
+  page,
+}) => {
+  await page.goto("/settings");
+  await page.getByLabel("경고 시간 (초)").fill("12");
+  await page.getByText("높음", { exact: true }).click();
+  await page.getByLabel("소리 알림").check();
+  await page.getByRole("button", { name: "적용", exact: true }).click();
+  await expect(page).toHaveURL(/\/$/);
+  // 실제 저장 완료를 기다린 후 새 문서에서 설정을 다시 읽는다.
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          new Promise<boolean>((resolve, reject) => {
+            const request = indexedDB.open("fast-turtle");
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => {
+              const db = request.result;
+              const tx = db.transaction("settings", "readonly");
+              const rows = tx.objectStore("settings").getAll();
+              rows.onsuccess = () =>
+                resolve(
+                  rows.result.some(
+                    (row) =>
+                      row.settings.warningSeconds === 12 &&
+                      row.settings.sound &&
+                      row.settings.sensitivity === "high",
+                  ),
+                );
+              tx.oncomplete = () => db.close();
+              tx.onerror = () => {
+                db.close();
+                reject(tx.error);
+              };
+            };
+          }),
+      ),
+    )
+    .toBe(true);
+  await page.goto("/settings");
+  await expect(page.getByLabel("경고 시간 (초)")).toHaveValue("12");
+  await expect(page.getByRole("radio", { name: "높음" })).toBeChecked();
+  await expect(page.getByLabel("소리 알림")).toBeChecked();
+});
 test("synthetic camera registration, monitoring and stopping tracks", async ({
   page,
 }) => {
