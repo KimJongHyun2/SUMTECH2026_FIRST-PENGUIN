@@ -116,21 +116,42 @@ export class PairingService {
     }
   }
   private onMessage(data: unknown, onReady: () => void) {
-    let message: RelayMessage;
+    let parsed: unknown;
     try {
-      message = JSON.parse(String(data));
+      parsed = JSON.parse(String(data));
     } catch {
       return;
     }
-    if (typeof message.serverTime === "number")
-      this.offset = message.serverTime - Date.now();
+    if (
+      !parsed ||
+      typeof parsed !== "object" ||
+      Array.isArray(parsed) ||
+      !("type" in parsed) ||
+      typeof parsed.type !== "string"
+    )
+      return;
+    const message = parsed as RelayMessage;
     if (message.type === "hello") {
+      // 중복 hello로 QR 발급·연결 요청을 다시 실행하거나 잘못된 주기로 ping을 보내지 않는다.
+      if (this.ready || !Number.isFinite(message.serverTime)) return;
+      const every = message.heartbeatMs ?? 2000;
+      if (
+        !Number.isSafeInteger(every) ||
+        Number(every) <= 0 ||
+        Number(every) > 2147483647
+      )
+        return;
       clearTimeout(this.connectTimer);
       this.ready = true;
-      const every = Number(message.heartbeatMs) || 2000;
       clearInterval(this.heartbeat);
-      this.heartbeat = setInterval(() => this.send({ type: "ping" }), every);
+      this.offset = Number(message.serverTime) - Date.now();
+      this.heartbeat = setInterval(
+        () => this.send({ type: "ping" }),
+        Number(every),
+      );
       onReady();
+    } else if (Number.isFinite(message.serverTime)) {
+      this.offset = Number(message.serverTime) - Date.now();
     }
     if (message.type !== "pong") this.receive(message);
   }
@@ -149,6 +170,7 @@ export class PairingService {
     clearInterval(this.heartbeat);
     clearTimeout(this.connectTimer);
     this.ready = false;
+    this.offset = 0;
     const socket = this.socket;
     this.socket = undefined;
     socket?.close();

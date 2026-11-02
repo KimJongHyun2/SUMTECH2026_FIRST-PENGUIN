@@ -103,3 +103,34 @@ test("접속 성공 뒤 유실은 기존 승인을 폐기하며 준비 콜백을
   await new Promise((resolve) => setTimeout(resolve, 50));
   expect(ready).toHaveBeenCalledTimes(1);
 });
+
+test("JSON 값이나 잘못된 hello는 무시하고 정상 hello 뒤에만 준비한다", () => {
+  const pc = client(PendingSocket), ready = vi.fn();
+  pc.service.connect("pc", ready);
+  const socket = PendingSocket.instances.at(-1)!;
+  socket.readyState = 1;
+  for (const data of ["null", "42", '"hello"', "[]", "{}", '{"type":7}', '{"type":"hello","serverTime":null}', '{"type":"hello","serverTime":1,"heartbeatMs":-1}']) {
+    expect(() => socket.onmessage?.({ data })).not.toThrow();
+  }
+  expect(ready).not.toHaveBeenCalled();
+  expect(pc.inbox).toEqual([]);
+  socket.receive({ type: "hello", serverTime: Date.now(), heartbeatMs: 2000 });
+  expect(ready).toHaveBeenCalledOnce();
+  pc.service.close();
+});
+
+test("중복 hello는 준비 콜백을 다시 실행하지 않고 잘못된 서버 시각을 반영하지 않는다", () => {
+  const pc = client(PendingSocket), ready = vi.fn();
+  pc.service.connect("pc", ready);
+  const socket = PendingSocket.instances.at(-1)!;
+  socket.readyState = 1;
+  socket.receive({ type: "hello", serverTime: Date.now() + 60000, heartbeatMs: 2000 });
+  const offset = pc.service.toServer(0);
+  socket.receive({ type: "hello", serverTime: Date.now(), heartbeatMs: 2000 });
+  expect(ready).toHaveBeenCalledOnce();
+  socket.onmessage?.({ data: '{"type":"pong","serverTime":1e999}' });
+  expect(Number.isFinite(pc.service.toServer(0))).toBe(true);
+  pc.service.close();
+  expect(pc.service.toServer(0)).toBe(0);
+  expect(offset).toBeGreaterThan(59000);
+});
