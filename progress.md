@@ -2,6 +2,32 @@
 
 제품 명세는 docs의 problem.yaml·scenarios.yaml·prd.md 3개이다. 아래 현재 상태와 과거 실행 기록을 구분한다.
 
+## 최근 유지보수 — 연결·카메라 복구와 설정 복원 (2026-11-02)
+
+기능 코드 기준은 main `8a7ceb9`이다. 이전 절의 미완료·검증 결과는 각 절에 적힌 과거 버전의 기록이다. 최신 실행 방법은 [프론트엔드 README](frontend/README.md)를 따른다.
+
+| 변경 | 반영 기록 |
+|---|---|
+| React 프론트엔드 단위 테스트·타입·빌드·화면 검사를 CI에 추가했다. | [PR #12](https://github.com/KimJongHyun2/SUMTECH2026_FIRST-PENGUIN/pull/12)이다. |
+| 측면 영상 연결 실패·15초 연결 시간 초과를 안내하고 새 QR로 복구한다. 같은 배치 화면에서도 재발급한다. | [PR #14](https://github.com/KimJongHyun2/SUMTECH2026_FIRST-PENGUIN/pull/14)이다. |
+| 측면 영상의 재생 실패는 연결을 유지하며 영상만 다시 재생한다. | [PR #16](https://github.com/KimJongHyun2/SUMTECH2026_FIRST-PENGUIN/pull/16)이다. |
+| 중계 메시지 형식·시각·heartbeat를 검사하고 중복 hello의 재요청과 이전 연결의 시계 보정값 잔류를 막았다. | [PR #17](https://github.com/KimJongHyun2/SUMTECH2026_FIRST-PENGUIN/pull/17)이다. |
+| 취소된 카메라 초기화에서 늦게 생성된 모델을 해제하고, 종료 후 재시작 때 닫힌 모델을 재사용하지 않는다. | [PR #18](https://github.com/KimJongHyun2/SUMTECH2026_FIRST-PENGUIN/pull/18)이다. |
+| 저장소를 읽은 뒤 설정 폼을 표시해 새로고침 시 기본값이 저장된 값을 덮어쓰는 문제를 막았다. | [PR #19](https://github.com/KimJongHyun2/SUMTECH2026_FIRST-PENGUIN/pull/19)이다. |
+| QR 서버 주소에 HTTPS와 개발용 HTTP localhost만 허용한다. file·FTP 주소로 화면이 중단되지 않는다. | [PR #20](https://github.com/KimJongHyun2/SUMTECH2026_FIRST-PENGUIN/pull/20)이다. |
+| 정면·휴대폰 자체 미리보기의 재생 실패를 안내하고 기존 카메라·자세 입력을 유지한 채 다시 재생한다. | [PR #21](https://github.com/KimJongHyun2/SUMTECH2026_FIRST-PENGUIN/pull/21)이다. |
+
+### 검증 결과와 남은 확인
+
+| 검증 | 결과 |
+|---|---|
+| 프론트엔드 단위 테스트 | 4개 파일·26개가 통과했다. 중계 메시지 오류·중복 hello·모델 생성 취소·자원 정리·재시작을 포함한다. |
+| TypeScript·프로덕션 빌드·공백 검사 | 통과했다. 500KB 초과 번들 경고는 남아 있다. |
+| Chromium 화면·녹화 입력 | 소스를 고정하고 `app.spec.ts`·`eval.spec.ts`를 `--workers=1`로 실행해 10개가 통과했다. 설정 저장 후 새 문서의 복원, QR 잘못된 주소 거부, 정면·측면 영상 복구와 기본·딥 모드의 실제 모델 추론·판정·리포트 저장을 확인했다. |
+| 원격 브랜치 CI | 각 수정 브랜치의 5개 작업을 통과했다. 최신 기능 브랜치 결과는 [실행 41412871434](https://github.com/Lee-D-S/SUMTECH2026_FIRST-PENGUIN/actions/runs/41412871434)이다. main의 CI·전체 시나리오는 [Actions](https://github.com/KimJongHyun2/SUMTECH2026_FIRST-PENGUIN/actions)의 해당 커밋 결과를 확인한다. |
+| 추가 진단 | 최초 병렬 추론 검사에서는 복귀 중 입력 중단 1회, 미리보기 전체 화면 검사에서는 등록 중 카메라 꺼짐 1회를 관찰했다. 격리 추적과 소스를 고정한 최종 순차 검사는 통과했다. 최초 실패의 정확한 원인은 미확정이다. |
+| 미검증 | 실제 다중 기기·카메라 권한·운영체제 카메라 표시등·망별 WebRTC·숨긴 탭의 실제 경고 전달·운영 장시간 검증은 별도이다. 합성·녹화 입력 통과를 이 검증의 완료로 해석하지 않는다. |
+
 ## 6번 — E2E 딥 등록·재등록 및 복귀 판정 보완 (2026-10-30)
 
 기준은 main `f5809b6`이다. 아래는 해당 기준에 적용한 변경과 로컬 검증 결과이며 원격 CI·주최 측 실행의 통과를 뜻하지 않는다. 커밋·반영 이력은 Git 이력을, 원격 검증 상태는 해당 버전의 Actions 결과를 따른다. 7~9번의 제품 정책·알림·기준 등록 UX 변경은 이번 범위에 포함하지 않았다.
