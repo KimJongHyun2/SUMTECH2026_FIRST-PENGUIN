@@ -115,7 +115,9 @@ export function ConnectPage() {
               const parsed = new URL(origin);
               if (
                 parsed.protocol !== "https:" &&
-                parsed.hostname !== "localhost"
+                !(
+                  parsed.protocol === "http:" && parsed.hostname === "localhost"
+                )
               )
                 throw new Error();
               setQrOrigin(parsed.origin);
