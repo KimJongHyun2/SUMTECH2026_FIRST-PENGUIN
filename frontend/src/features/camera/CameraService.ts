@@ -61,22 +61,38 @@ export class CameraService {
     }
     try {
       await this.video.play();
+      if (generation !== this.generation)
+        throw new DOMException("취소됨", "AbortError");
       const files = await FilesetResolver.forVisionTasks("/mediapipe/wasm");
+      if (generation !== this.generation)
+        throw new DOMException("취소됨", "AbortError");
       // CPU 경로는 GPU 초기화가 실패한 환경에서도 동일한 모델을 사용한다.
-      if (!this.pose)
-        this.pose = await PoseLandmarker.createFromOptions(files, {
+      if (!this.pose) {
+        const pose = await PoseLandmarker.createFromOptions(files, {
           baseOptions: { modelAssetPath: "/models/pose_landmarker_lite.task" },
           runningMode: "VIDEO",
           // 뒤쪽의 다른 사람이 함께 잡혀도 가장 가까운 사람을 사용자로 본다.
           numPoses: 3,
         });
-      if (!side && !this.face)
-        this.face = await FaceLandmarker.createFromOptions(files, {
+        if (generation !== this.generation) {
+          pose.close();
+          throw new DOMException("취소됨", "AbortError");
+        }
+        this.pose = pose;
+      }
+      if (!side && !this.face) {
+        const face = await FaceLandmarker.createFromOptions(files, {
           baseOptions: { modelAssetPath: "/models/face_landmarker.task" },
           runningMode: "VIDEO",
           numFaces: 1,
           outputFacialTransformationMatrixes: true,
         });
+        if (generation !== this.generation) {
+          face.close();
+          throw new DOMException("취소됨", "AbortError");
+        }
+        this.face = face;
+      }
       if (generation !== this.generation)
         throw new DOMException("취소됨", "AbortError");
       this.lastFrame = -1;
@@ -167,5 +183,7 @@ export class CameraService {
     this.stop();
     this.pose?.close();
     this.face?.close();
+    this.pose = undefined;
+    this.face = undefined;
   }
 }
