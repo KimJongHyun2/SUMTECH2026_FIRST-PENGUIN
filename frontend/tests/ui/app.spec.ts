@@ -101,47 +101,104 @@ test("QR 서버 주소의 지원하지 않는 프로토콜을 거부하고 화�
   }
   expect(errors).toEqual([]);
 });
-test("synthetic camera registration, monitoring and stopping tracks", async ({
-  page,
-}) => {
-  await page.route("**/src/features/camera/CameraService.ts", (route) =>
-    route.fulfill({
-      contentType: "application/javascript",
-      body: `
+for (const playbackFailure of [false, true]) {
+  test(
+    playbackFailure
+      ? "정면 미리보기 재생 실패를 복구한 뒤 기준 등록과 감지를 진행한다"
+      : "synthetic camera registration, monitoring and stopping tracks",
+    async ({ page }) => {
+      if (playbackFailure)
+        await page.addInitScript(() => {
+          const play = HTMLMediaElement.prototype.play;
+          let blocked = true;
+          document.addEventListener(
+            "click",
+            (event) => {
+              if (
+                event.target instanceof Element &&
+                event.target
+                  .closest("button")
+                  ?.textContent?.includes("미리보기 다시 재생")
+              )
+                blocked = false;
+            },
+            true,
+          );
+          HTMLMediaElement.prototype.play = function () {
+            if (
+              blocked &&
+              this.getAttribute("aria-label") === "카메라 미리보기"
+            ) {
+              return Promise.reject(
+                new DOMException("재생 요청 거부", "NotAllowedError"),
+              );
+            }
+            return play.call(this);
+          };
+        });
+      await page.route("**/src/features/camera/CameraService.ts", (route) =>
+        route.fulfill({
+          contentType: "application/javascript",
+          body: `
  export class CameraService {
  constructor(callback){this.callback=callback;this.stream=null;}
- async start(){ const canvas=document.createElement('canvas');canvas.width=640;canvas.height=480;this.stream=canvas.captureStream(10);window.testTracks=this.stream.getTracks();this.timer=setInterval(()=>this.callback({quality:'valid',signals:{head_forward:.4,neck_len:.4,ear_vis:1,shoulder_vis:1,pitch_deg:0},angle:null,at:Date.now()}),250);}
+ async start(){ const canvas=document.createElement('canvas');canvas.width=640;canvas.height=480;const paint=canvas.getContext('2d');this.stream=canvas.captureStream(10);window.testTracks=this.stream.getTracks();this.timer=setInterval(()=>{paint.fillStyle='rgb('+(Date.now()%255)+',0,0)';paint.fillRect(0,0,640,480);this.callback({quality:'valid',signals:{head_forward:.4,neck_len:.4,ear_vis:1,shoulder_vis:1,pitch_deg:0},angle:null,at:Date.now()});},250);}
  stop(){clearInterval(this.timer);this.stream?.getTracks().forEach(t=>t.stop());this.stream=null;}
  dispose(){this.stop();}
  }`,
-    }),
+        }),
+      );
+      await page.goto("/");
+      await page.getByRole("button", { name: /자세 등록하고 시작/ }).click();
+      await expect(page).toHaveURL(/\/setup$/);
+      await page.getByRole("button", { name: "카메라 켜기" }).click();
+      if (playbackFailure) {
+        const alert = page.getByRole("alert");
+        await expect(alert).toContainText(
+          "카메라 미리보기를 재생하지 못했어요",
+        );
+        await alert.getByRole("button", { name: "미리보기 다시 재생" }).click();
+        await expect(alert).toHaveCount(0);
+        await expect
+          .poll(() =>
+            page
+              .getByLabel("카메라 미리보기")
+              .evaluate(
+                (video: HTMLVideoElement) =>
+                  !video.paused && video.readyState >= 2,
+              ),
+          )
+          .toBe(true);
+      }
+      const register = page.getByRole("button", {
+        name: "기준 자세 등록",
+        exact: true,
+      });
+      await expect(register).toBeDisabled();
+      await page.getByRole("checkbox").check();
+      await expect(register).toBeEnabled();
+      await register.click();
+      const begin = page.getByRole("button", {
+        name: "탐지 시작",
+        exact: true,
+      });
+      await expect(begin).toBeEnabled({ timeout: 10000 });
+      await begin.click();
+      await expect(page).toHaveURL(/\/watch$/);
+      await page.screenshot({ path: "test-results/watch.png", fullPage: true });
+      await page
+        .getByRole("button", { name: "일시 정지", exact: true })
+        .click();
+      expect(
+        await page.evaluate(() =>
+          (window as any).testTracks.every(
+            (t: MediaStreamTrack) => t.readyState === "ended",
+          ),
+        ),
+      ).toBe(true);
+    },
   );
-  await page.goto("/");
-  await page.getByRole("button", { name: /자세 등록하고 시작/ }).click();
-  await expect(page).toHaveURL(/\/setup$/);
-  await page.getByRole("button", { name: "카메라 켜기" }).click();
-  const register = page.getByRole("button", {
-    name: "기준 자세 등록",
-    exact: true,
-  });
-  await expect(register).toBeDisabled();
-  await page.getByRole("checkbox").check();
-  await expect(register).toBeEnabled();
-  await register.click();
-  const begin = page.getByRole("button", { name: "탐지 시작", exact: true });
-  await expect(begin).toBeEnabled({ timeout: 10000 });
-  await begin.click();
-  await expect(page).toHaveURL(/\/watch$/);
-  await page.screenshot({ path: "test-results/watch.png", fullPage: true });
-  await page.getByRole("button", { name: "일시 정지", exact: true }).click();
-  expect(
-    await page.evaluate(() =>
-      (window as any).testTracks.every(
-        (t: MediaStreamTrack) => t.readyState === "ended",
-      ),
-    ),
-  ).toBe(true);
-});
+}
 
 for (const stage of ["배치 안내", "측정 화면", "영상 재생"]) {
   test(
