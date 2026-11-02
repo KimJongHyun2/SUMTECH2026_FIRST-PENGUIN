@@ -79,6 +79,28 @@ test("설정 화면을 새로 열어도 저장한 알림 설정을 복원한다"
   await expect(page.getByRole("radio", { name: "높음" })).toBeChecked();
   await expect(page.getByLabel("소리 알림")).toBeChecked();
 });
+
+test("QR 서버 주소의 지원하지 않는 프로토콜을 거부하고 화면을 유지한다", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto("/connect");
+  await expect(page.getByLabel("휴대폰 연결 QR")).toBeVisible();
+  for (const address of [
+    "file://localhost/example",
+    "ftp://localhost",
+    "http://example.com",
+  ]) {
+    await page
+      .getByRole("textbox", { name: "휴대폰에서 접속 가능한 이 서버 주소" })
+      .fill(address);
+    await page.getByRole("button", { name: "QR 생성 / 재발급" }).click();
+    await expect(page.getByRole("alert")).toContainText("HTTPS 서버 주소");
+    await expect(page.getByLabel("휴대폰 연결 QR")).toBeVisible();
+  }
+  expect(errors).toEqual([]);
+});
 test("synthetic camera registration, monitoring and stopping tracks", async ({
   page,
 }) => {
