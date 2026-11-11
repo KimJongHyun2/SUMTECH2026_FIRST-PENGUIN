@@ -57,8 +57,13 @@ class Store {
   }
 
   async #setMeta(change) {
-    const meta = { ...(await this.#meta()), ...change };
-    await this.#tx(['meta'], 'readwrite', (tx) => promisify(tx.objectStore('meta').put(meta)));
+    // 읽기와 쓰기를 같은 트랜잭션에 묶어 다른 탭의 기준·설정 참조를 덮어쓰지 않는다.
+    await this.#tx(['meta'], 'readwrite', async (tx) => {
+      const store = tx.objectStore('meta');
+      const meta = (await promisify(store.get('current')))
+        ?? { key: 'current', currentBaselineId: null, currentSettingsId: null };
+      await promisify(store.put({ ...meta, ...change }));
+    });
   }
 
   // ------------------------------------------------------------ 기준 (불변 스냅샷, 덮어쓰지 않음)
