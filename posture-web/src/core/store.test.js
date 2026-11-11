@@ -37,6 +37,25 @@ describe('기준·설정 (F1·F5)', () => {
     await expect(store.addBaseline(baseline('b1'))).rejects.toThrow();
   });
 
+  it('서로 다른 탭에서 기준과 설정을 동시에 저장해도 두 현재 참조를 보존한다', async () => {
+    const factory = new IDBFactory();
+    const first = await openStore(factory);
+    const second = await openStore(factory);
+    try {
+      await Promise.all([
+        first.addBaseline(baseline('parallel-baseline')),
+        second.addSettingsVersion({ id: 'parallel-settings', appliedAt: 1, settings: DEFAULT_SETTINGS }),
+      ]);
+      expect((await first.currentBaseline())?.id).toBe('parallel-baseline');
+      expect((await second.currentSettings())?.id).toBe('parallel-settings');
+      expect((await second.currentBaseline())?.id).toBe('parallel-baseline');
+      expect((await first.currentSettings())?.id).toBe('parallel-settings');
+    } finally {
+      first.close();
+      second.close();
+    }
+  });
+
   it('설정 버전도 불변으로 쌓이고 현재 버전을 기억한다', async () => {
     await store.addSettingsVersion({ id: 'c1', appliedAt: 1, settings: DEFAULT_SETTINGS });
     await store.addSettingsVersion({ id: 'c2', appliedAt: 2, settings: { ...DEFAULT_SETTINGS, warningSeconds: 12 } });
